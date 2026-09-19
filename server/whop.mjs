@@ -51,15 +51,15 @@ export async function createCheckout(u, b) {
         method: "POST",
         signal: AbortSignal.timeout(20000),
         headers: {
-          Authorization: `Bearer ${process.env.WHOP_API_KEY}`,
+          Authorization: `Bearer ${process.env.WHOP_API_KEY.trim()}`,
           "Content-Type": "application/json",
           "Idempotency-Key": p.id,
         },
         body: JSON.stringify({
           mode: "payment",
           plan: {
-            company_id: process.env.WHOP_COMPANY_ID,
-            product_id: process.env.WHOP_PRODUCT_ID,
+            company_id: process.env.WHOP_COMPANY_ID.trim(),
+            product_id: process.env.WHOP_PRODUCT_ID.trim(),
             initial_price: cents / 100,
             force_create_new_plan: true,
             adaptive_pricing_enabled: false,
@@ -77,17 +77,47 @@ export async function createCheckout(u, b) {
         }),
       },
     );
+    if (!r.ok) {
+      // Never retain the response body: providers can echo credentials or customer data.
+      const error = new Error("Whop rejected checkout");
+      error.providerStatus = r.status;
+      throw error;
+    }
     const body = await r.json();
-    if (!r.ok || !body.id || !body.plan?.id) throw new Error("provider");
+    if (!body?.id || !body.plan?.id) {
+      const error = new Error("Invalid Whop checkout response");
+      error.providerCode = "INVALID_RESPONSE";
+      throw error;
+    }
     p.sessionId = body.id;
     p.planId = body.plan.id;
     p.status = "pending";
     await save("payment", p);
     return p;
-  } catch {
+  } catch (error) {
+    const status = error.providerStatus;
+    const code = status === 401 ? "AUTHENTICATION"
+      : status === 403 ? "PERMISSIONS"
+      : status === 404 ? "NOT_FOUND"
+      : [400, 422].includes(status) ? "CONFIGURATION"
+      : status === 429 ? "RATE_LIMIT"
+      : error.name === "TimeoutError" ? "TIMEOUT"
+      : error.providerCode === "INVALID_RESPONSE" || error instanceof SyntaxError ? "INVALID_RESPONSE"
+      : status >= 500 ? "PROVIDER_UNAVAILABLE" : "CONNECTION";
     p.status = "failed";
+    p.failureCode = code;
+    if (Number.isInteger(status)) p.providerStatus = status;
     await save("payment", p);
-    fail("تعذر إنشاء جلسة الدفع لدى Whop. لم يتم خصم أي مبلغ هنا.", 502);
+    console.error("Whop checkout failed", { paymentId: p.id, code, status: status || null });
+    const messages = {
+      AUTHENTICATION: "رفض Whop مفتاح الدفع. يجب على الإدارة مراجعة WHOP_API_KEY.",
+      PERMISSIONS: "رفض Whop صلاحيات مفتاح الدفع. يجب على الإدارة تفعيل صلاحيات إنشاء جلسات الدفع والخطط للمتجر.",
+      NOT_FOUND: "لم يعثر Whop على مورد الدفع. يجب على الإدارة مراجعة معرّف الشركة والمنتج.",
+      CONFIGURATION: "رفض Whop إعدادات جلسة الدفع. يجب على الإدارة مراجعة إعدادات الشركة والمنتج.",
+      RATE_LIMIT: "طلبات الدفع كثيرة حالياً. حاول مجدداً بعد قليل.",
+      TIMEOUT: "انتهت مهلة الاتصال بـ Whop. حاول مجدداً بعد قليل.",
+    };
+    fail((messages[code] || "تعذر إنشاء جلسة الدفع لدى Whop.") + " لم يتم خصم أي مبلغ هنا. رمز التشخيص: " + code, 502);
   }
 }
 export function verifySignature(
