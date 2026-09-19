@@ -1,0 +1,53 @@
+.language-switcher{display:inline-flex;align-items:center;flex-shrink:0}
+.language-switcher select{width:auto;min-width:112px;min-height:38px;padding:7px 30px 7px 11px;border-radius:999px;border:1px solid #d6e4dc;background:#f6faf7;color:var(--navy);font-size:12px;font-weight:600;cursor:pointer}
+.language-switcher.compact select{min-width:86px;min-height:34px;font-size:11px}
+.language-switcher select:focus{outline:3px solid #f0aa57;outline-offset:2px}
+.nav-controls{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.auth-language-row{display:flex;justify-content:flex-end;margin-bottom:12px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* The workspace is authored RTL. Keep the same visual system usable for LTR languages. */
+[dir="ltr"] body{text-align:left}
+[dir="ltr"] .main-shell{margin-right:0;margin-left:274px}
+[dir="ltr"] .sidebar{right:auto;left:0;border-left:0;border-right:1px solid #dce7df}
+[dir="ltr"] .sidebar nav a.active{box-shadow:inset 3px 0 0 var(--green)}
+[dir="ltr"] .sidebar nav a .nav-count{margin-right:0;margin-left:auto}
+[dir="ltr"] .workspace-tag>svg{margin-right:0;margin-left:auto}
+[dir="ltr"] .user-card{text-align:left}
+[dir="ltr"] .user-card>svg{margin-right:0;margin-left:auto}
+[dir="ltr"] .date-text{border-left:0;border-right:1px solid var(--line);padding-left:0;padding-right:21px}
+[dir="ltr"] .preview-badge,[dir="ltr"] .preview-index{margin-right:0;margin-left:auto}
+[dir="ltr"] .audience-icon{left:auto;right:36px}
+[dir="ltr"] .preview-floating{left:auto;right:-24px}
+[dir="ltr"] .footer-grid .brand{justify-content:flex-start}
+[dir="ltr"] .auth-story{border-left:0;border-right:1px solid #ffffff10}
+[dir="ltr"] .auth-story .brand{justify-content:flex-start}
+[dir="ltr"] .back-link{flex-direction:row-reverse;justify-content:flex-end}
+[dir="ltr"] .site-nav nav a:after{transform-origin:left}
+[dir="ltr"] .crypto-method{text-align:left}
+[dir="ltr"] .crypto-method>svg{margin-right:0;margin-left:auto}
+[dir="ltr"] .workspace-footer{direction:ltr}
+[dir="ltr"] .site-nav-inner,[dir="ltr"] .hero-grid,[dir="ltr"] .public-section,[dir="ltr"] .public-page-hero,[dir="ltr"] .site-cta,[dir="ltr"] .footer-grid{direction:ltr}
+[dir="ltr"] .brand{direction:ltr}
+[dir="ltr"] .page-heading,[dir="ltr"] .section-heading,[dir="ltr"] .field,[dir="ltr"] .form,[dir="ltr"] .panel,[dir="ltr"] .table-wrap,[dir="ltr"] .modal,[dir="ltr"] .wallet-side,[dir="ltr"] .wallet-main,[dir="ltr"] .checkout-summary{direction:ltr}
+[dir="ltr"] .numeric,[dir="ltr"] code,[dir="ltr"] .pricing-card>strong{direction:ltr}
+
+@media(max-width:1150px){
+  [dir="ltr"] .main-shell{margin-left:246px;margin-right:0}
+}
+@media(max-width:850px){
+  .nav-controls{margin-left:auto}
+  [dir="ltr"] .main-shell{margin:0}
+  [dir="ltr"] .sidebar{right:auto;left:0;transform:translateX(-100%)}
+  [dir="ltr"] .sidebar.is-open{transform:translateX(0)}
+  [dir="ltr"] .audience-icon{right:24px;left:auto}
+  [dir="ltr"] .preview-floating{right:-12px;left:auto}
+  [dir="ltr"] .auth-story{border-right:0}
+}
+@media(max-width:580px){
+  .nav-controls{gap:5px}
+  [dir="ltr"] .preview-floating{right:0;left:auto}
+  [dir="ltr"] .audience-icon{right:24px}
+  .language-switcher select{min-width:76px;padding-inline:8px;font-size:11px}
+  .site-nav-inner .language-switcher select{min-width:66px}
+}
