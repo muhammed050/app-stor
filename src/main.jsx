@@ -60,6 +60,7 @@ import "@fontsource/ibm-plex-sans-arabic/500.css";
 import "@fontsource/ibm-plex-sans-arabic/600.css";
 import "@fontsource/ibm-plex-sans-arabic/700.css";
 import "./styles.css";
+import { requestJson } from "./http.mjs";
 const WhopEmbed = lazy(() =>
   import("@whop/checkout/react").then((m) => ({
     default: m.WhopCheckoutEmbed,
@@ -69,7 +70,7 @@ const Context = createContext(null);
 const useApp = () => useContext(Context);
 let csrf = "";
 async function api(path, body) {
-  const res = await fetch(`/api${path}`, {
+  return requestJson(`/api${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers:
       body === undefined
@@ -77,9 +78,6 @@ async function api(path, body) {
         : { "Content-Type": "application/json", "X-CSRF-Token": csrf },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "تعذر إكمال الطلب");
-  return data;
 }
 const money = (n) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
@@ -1230,7 +1228,7 @@ function Apps() {
 }
 async function uploadFile(file, kind = "app") {
   if (!file || !file.size) throw new Error("اختر الملف أولًا");
-  const r = await fetch("/api/upload", {
+  return requestJson("/api/upload", {
     method: "POST",
     headers: {
       "X-CSRF-Token": csrf,
@@ -1239,9 +1237,6 @@ async function uploadFile(file, kind = "app") {
     },
     body: file,
   });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error);
-  return data;
 }
 function NewApp() {
   const { data, user, go } = useApp();
