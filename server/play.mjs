@@ -1,11 +1,12 @@
 const packagePattern = /^[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
 export function packageName(value) {
+  if (typeof value === "string") value = value.trim();
   if (
     typeof value !== "string" ||
     value.length > 180 ||
     !packagePattern.test(value)
   )
-    throw new Error("معرّف التطبيق غير صالح");
+    throw Object.assign(new Error("معرّف التطبيق غير صالح. أدخل Package name مثل com.example.myapp، وليس اسم التطبيق أو رابط المتجر."), { status: 400 });
   return value;
 }
 export function playUrl(value) {
@@ -18,7 +19,7 @@ export function playUrl(value) {
     u.password ||
     u.pathname !== "/store/apps/details"
   )
-    throw new Error("أدخل رابط تطبيق من Google Play");
+    throw Object.assign(new Error("أدخل رابط تطبيق من Google Play"), { status: 400 });
   return `https://play.google.com/store/apps/details?id=${encodeURIComponent(packageName(u.searchParams.get("id")))}&hl=en&gl=US`;
 }
 export function publisherIdentity(value) {
@@ -32,7 +33,7 @@ export function publisherIdentity(value) {
     !["/store/apps/developer", "/store/apps/dev"].includes(u.pathname) ||
     !u.searchParams.get("id")
   )
-    throw new Error("رابط صفحة الناشر غير صالح");
+    throw Object.assign(new Error("رابط صفحة الناشر غير صالح"), { status: 400 });
   return `${u.pathname}?id=${u.searchParams.get("id")}`;
 }
 export function parseListing(

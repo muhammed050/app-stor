@@ -1319,6 +1319,10 @@ function NewApp() {
               <Field
                 label="معرّف التطبيق Package name"
                 name="packageName"
+                pattern="[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+"
+                maxLength={180}
+                title="أدخل معرّف الحزمة مثل com.example.myapp"
+                hint="اكتب applicationId من مشروع تطبيقك، مثل com.example.myapp؛ وليس اسم التطبيق أو رابط المتجر."
                 dir="ltr"
                 required
                 placeholder="com.yourcompany.app"

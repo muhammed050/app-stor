@@ -113,6 +113,12 @@ test("API cannot mint wallet money and unauthenticated users cannot read state",
     404,
   );
 });
+test("invalid package name returns actionable validation instead of server failure", async () => {
+  const file = await save("file", {owner: client.user.id, kind: "app", name: "test.aab"});
+  const response = await req("/apps", {fileId: file.id, budget: 5000, packageName: "My App"}, client);
+  assert.equal(response.status, 400);
+  assert.match(response.body.error, /com\.example\.myapp/);
+});
 test("upload is private, rejects wrong file signatures and isolates owner", async () => {
   const h = {
     cookie: client.cookie,
