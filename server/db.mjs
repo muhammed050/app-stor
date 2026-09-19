@@ -94,7 +94,7 @@ export const defaults = {
   updateShare: 1500,
   holdHours: 72,
   minWithdrawal: 2500,
-  platformName: "إلديفو",
+  platformName: "Dorucenie",
   supportEmail: "",
   depositInstructions:
     "الشحن متوقف حتى تضيف الإدارة بيانات وسيلة الدفع وتعليمات التحويل.",

@@ -15,7 +15,7 @@ export async function bootstrapAdmin() {
     if (await db.prepare("SELECT 1 FROM users WHERE email=?").get(email))
       throw Object.assign(new Error("Admin email is already registered; use admin CLI"), { code: "ADMIN_EMAIL_ALREADY_REGISTERED" });
     await createUser({
-      name: "إدارة إلديفو",
+      name: "إدارة Dorucenie",
       email,
       password: process.env.ADMIN_PASSWORD,
       role: "admin",

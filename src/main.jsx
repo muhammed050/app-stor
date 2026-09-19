@@ -343,17 +343,17 @@ function App() {
   }, [user?.id]);
   useEffect(() => {
     const meta = publicPages[path];
-    document.title = meta?.title || `${path.startsWith("/admin") ? "الإدارة" : path === "/wallet" ? "المحفظة" : "مساحة العمل"} — إلديفو`;
+    document.title = meta?.title || `${path.startsWith("/admin") ? "الإدارة" : path === "/wallet" ? "المحفظة" : "مساحة العمل"} — Dorucenie`;
     const setMeta = (name, content, property = false) => {
       const attribute = property ? "property" : "name";
       let element = document.head.querySelector(`meta[${attribute}="${name}"]`);
       if (!element) { element = document.createElement("meta"); element.setAttribute(attribute, name); document.head.append(element); }
       element.content = content;
     };
-    setMeta("description", meta?.description || "مساحة العمل الخاصة بحسابك في إلديفو.");
+    setMeta("description", meta?.description || "مساحة العمل الخاصة بحسابك في Dorucenie.");
     setMeta("robots", meta ? "index, follow, max-image-preview:large" : "noindex, nofollow");
     setMeta("og:title", document.title, true);
-    setMeta("og:description", meta?.description || "مساحة العمل الخاصة بحسابك في إلديفو.", true);
+    setMeta("og:description", meta?.description || "مساحة العمل الخاصة بحسابك في Dorucenie.", true);
     setMeta("og:url", siteOrigin + path, true);
     let canonical = document.head.querySelector('link[rel="canonical"]');
     if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.append(canonical); }
@@ -376,7 +376,7 @@ function App() {
   if (!ready && !publicPages[path])
     return (
       <div className="loading-screen">
-        <img className="brand-symbol" src="/brand/eldevo-mark.webp" width="56" height="56" alt="إلديفو"/>
+        <img className="brand-symbol" src="/brand/dorucenie-mark.webp" width="56" height="56" alt="Dorucenie"/>
         <p>نجهز مساحة عملك…</p>
       </div>
     );
@@ -450,7 +450,7 @@ function Auth() {
             </span>
           </div>
         </div>
-        <small>إلديفو منصة مستقلة وغير تابعة لـ Google.</small>
+        <small>Dorucenie منصة مستقلة وغير تابعة لـ Google.</small>
       </div>
       <div className="auth-form">
         <Link className="back-link" to="/">
@@ -640,7 +640,7 @@ function Shell() {
           <ChevronDown size={14} />
         </div>
         <small className="nav-caption">
-          {admin ? "إدارة إلديفو" : "مساحتك"}
+          {admin ? "إدارة Dorucenie" : "مساحتك"}
         </small>
         <nav>
           {items.map(([to, label, Icon]) => (
@@ -761,7 +761,7 @@ function Shell() {
           )}
         </main>
         <div className="workspace-footer">
-          <span>إلديفو · مساحة نشر تطبيقاتك</span>
+          <span>Dorucenie · مساحة نشر تطبيقاتك</span>
           <Link to="/legal/terms">
             الشروط والسياسات <ArrowUpLeft size={13} />
           </Link>
@@ -2156,7 +2156,7 @@ function Checkout() {
   return (
     <>
       <Heading
-        eyebrow="مدفوعات إلديفو"
+        eyebrow="مدفوعات Dorucenie"
         title="إضافة رصيد للخدمات"
         text="صفحة الدفع الخاصة بك؛ المبلغ واضح والتأكيد تلقائي."
       />
@@ -2216,7 +2216,7 @@ function Checkout() {
                 defaultValue={Math.max(50, data.settings.minTopup / 100)}
               />
               <Notice>
-                الرصيد مخصص لخدمات إلديفو. أي ضرائب أو رسوم إضافية يعرضها مزود
+                الرصيد مخصص لخدمات Dorucenie. أي ضرائب أو رسوم إضافية يعرضها مزود
                 الدفع قبل التأكيد.
               </Notice>
             </ActionForm>
@@ -2234,7 +2234,7 @@ function Checkout() {
           </div>
           <h2>كل شيء في مكانه.</h2>
           <p>
-            ادفع من داخل إلديفو. بيانات البطاقة تُعالج داخل مكوّن Whop الآمن.
+            ادفع من داخل Dorucenie. بيانات البطاقة تُعالج داخل مكوّن Whop الآمن.
           </p>
           {payment && (
             <div className="summary-row">
@@ -2315,7 +2315,7 @@ function Support() {
     <>
       <Heading
         title="الدعم والمساعدة"
-        text="أرسل سؤالك وتابع رد فريق إلديفو."
+        text="أرسل سؤالك وتابع رد فريق Dorucenie."
         action={
           <Button icon={Plus} onClick={() => setModal(true)}>
             تذكرة جديدة
@@ -2499,7 +2499,7 @@ function Admin() {
       <>
         <Heading
           eyebrow="مركز العمليات"
-          title="نظرة شاملة على إلديفو"
+          title="نظرة شاملة على Dorucenie"
           text="راجع الأولويات وأدر المنصة من مساحة واحدة."
         />
         <div className="stats-grid">

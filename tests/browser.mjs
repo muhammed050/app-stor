@@ -25,7 +25,7 @@ const pub = await createUser({
   role: "publisher",
 });
 await createUser({
-  name: "إدارة إلديفو",
+  name: "إدارة Dorucenie",
   email: "admin@example.test",
   password,
   role: "admin",
@@ -83,8 +83,8 @@ try {
     fullPage: true,
   });
   await page.setViewportSize({width:390,height:844});
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile home overflow');
   await page.screenshot({path:'playwright-report/home-mobile.png',fullPage:true});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile home overflow: '+await page.evaluate(()=>JSON.stringify([...document.querySelectorAll('body *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>innerWidth||r.right>innerWidth+1||r.left< -1}).slice(0,12).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width})))));
   for(const route of ['/how-it-works','/pricing','/publishers','/faq','/legal/privacy']) {
     await page.goto(base+route);
     await page.locator('h1').waitFor();
@@ -125,7 +125,7 @@ try {
     );
     await page
       .getByRole("heading", {
-        name: email.startsWith("admin") ? "نظرة شاملة على إلديفو" : /أهلًا/,
+        name: email.startsWith("admin") ? "نظرة شاملة على Dorucenie" : /أهلًا/,
       })
       .waitFor();
   }
@@ -198,7 +198,7 @@ try {
   await page.goto(base + "/admin");
   await page
     .getByRole("heading", {
-      name: "نظرة شاملة على إلديفو",
+      name: "نظرة شاملة على Dorucenie",
     })
     .waitFor();
   await page.screenshot({

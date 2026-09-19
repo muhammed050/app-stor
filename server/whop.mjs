@@ -77,7 +77,7 @@ export async function createCheckout(u, b) {
             plan_type: "one_time",
             force_create_new_plan: true,
             adaptive_pricing_enabled: false,
-            title: `Eldevo services ${p.id.slice(0, 8)}`,
+            title: `Dorucenie services ${p.id.slice(0, 8)}`,
           },
           metadata: {
             eldevo_payment_id: p.id,
