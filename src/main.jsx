@@ -66,7 +66,7 @@ import "./design.css";
 import "./design-v2.css";
 import "./i18n.css";
 import { Brand, PublicPage, PublicFooter } from "./public-pages.jsx";
-import { applyLanguage, LanguageSwitcher, translateDocument, useLanguage } from "./i18n.js";
+import { applyLanguage, LanguageSwitcher, translateDocument, translateValue, useLanguage } from "./i18n.js";
 import { publicPages, origin as siteOrigin, pageSchema } from "../shared/seo.mjs";
 import { cryptoMethods, enabledMethods, methodById, transactionUrl } from "../shared/crypto.mjs";
 import { requestJson } from "./http.mjs";
@@ -370,17 +370,18 @@ function App() {
   }, [language]);
   useEffect(() => {
     const meta = publicPages[path];
-    document.title = meta?.title || `${path.startsWith("/admin") ? "الإدارة" : path === "/wallet" ? "المحفظة" : "مساحة العمل"} — Dorucenie`;
+    const fallbackTitle = `${path.startsWith("/admin") ? "الإدارة" : path === "/wallet" ? "المحفظة" : "مساحة العمل"} — Dorucenie`;
+    document.title = translateValue(meta?.title || fallbackTitle, language);
     const setMeta = (name, content, property = false) => {
       const attribute = property ? "property" : "name";
       let element = document.head.querySelector(`meta[${attribute}="${name}"]`);
       if (!element) { element = document.createElement("meta"); element.setAttribute(attribute, name); document.head.append(element); }
       element.content = content;
     };
-    setMeta("description", meta?.description || "مساحة العمل الخاصة بحسابك في Dorucenie.");
+    setMeta("description", translateValue(meta?.description || "مساحة العمل الخاصة بحسابك في Dorucenie.", language));
     setMeta("robots", meta ? "index, follow, max-image-preview:large" : "noindex, nofollow");
     setMeta("og:title", document.title, true);
-    setMeta("og:description", meta?.description || "مساحة العمل الخاصة بحسابك في Dorucenie.", true);
+    setMeta("og:description", translateValue(meta?.description || "مساحة العمل الخاصة بحسابك في Dorucenie.", language), true);
     setMeta("og:url", siteOrigin + path, true);
     let canonical = document.head.querySelector('link[rel="canonical"]');
     if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.append(canonical); }
