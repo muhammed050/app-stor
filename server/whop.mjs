@@ -74,6 +74,7 @@ export async function createCheckout(u, b) {
             product_id: process.env.WHOP_PRODUCT_ID.trim(),
             initial_price: cents / 100,
             currency: "usd",
+            plan_type: "one_time",
             force_create_new_plan: true,
             adaptive_pricing_enabled: false,
             title: `Eldevo services ${p.id.slice(0, 8)}`,

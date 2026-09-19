@@ -25,6 +25,7 @@ test('successful unpaid checkout retains IDs and reuses session',async(t)=>{
     assert.equal(body.plan.product_id,'prod_test');
     assert.equal(body.plan.initial_price,10);
     assert.equal(body.plan.currency,'usd');
+    assert.equal(body.plan.plan_type,'one_time');
     return Response.json({id:'ch_test',plan:{id:'plan_test'}});
   });
   const user={id:'success',name:'Test',role:'client'};
