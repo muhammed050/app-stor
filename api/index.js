@@ -2,25 +2,17 @@ import { handler } from "../server/index.mjs";
 import { bootstrapAdmin } from "../server/bootstrap.mjs";
 export const config = { api: { bodyParser: false } };
 let boot;
+let retryAfter = 0;
 export default async function vercelHandler(req, res) {
-  try {
-    boot ||= bootstrapAdmin().catch((error) => {
+  // Administrator provisioning must never take the public API offline.
+  if (!boot && Date.now() >= retryAfter) {
+    boot = bootstrapAdmin().catch((error) => {
+      retryAfter = Date.now() + 60000;
       boot = null;
-      throw error;
+      const allowed = ["ADMIN_PASSWORD_TOO_SHORT", "ADMIN_EMAIL_INVALID", "ADMIN_EMAIL_ALREADY_REGISTERED"];
+      console.error("Administrator setup:", allowed.includes(error.code) ? error.code : "DATABASE_SETUP_FAILED");
     });
-    await boot;
-    return await handler(req, res);
-  } catch (error) {
-    console.error("API initialization failed:", error.code || error.name);
-    if (!res.headersSent)
-      res.writeHead(503, {
-        "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-      });
-    res.end(
-      JSON.stringify({
-        error: "تعذر الاتصال بقاعدة البيانات. تحقق من إعدادات الخادم.",
-      }),
-    );
   }
+  if (boot) await boot;
+  return handler(req, res);
 }

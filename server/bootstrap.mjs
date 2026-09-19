@@ -8,10 +8,12 @@ export async function bootstrapAdmin() {
     )
       return;
     const email = process.env.ADMIN_EMAIL.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      throw Object.assign(new Error("Invalid admin email"), { code: "ADMIN_EMAIL_INVALID" });
     if (process.env.ADMIN_PASSWORD.length < 14)
-      throw new Error("Admin password requires 14 characters");
+      throw Object.assign(new Error("Admin password requires 14 characters"), { code: "ADMIN_PASSWORD_TOO_SHORT" });
     if (await db.prepare("SELECT 1 FROM users WHERE email=?").get(email))
-      throw new Error("Admin email is already registered; use admin CLI");
+      throw Object.assign(new Error("Admin email is already registered; use admin CLI"), { code: "ADMIN_EMAIL_ALREADY_REGISTERED" });
     await createUser({
       name: "إدارة إلديفو",
       email,
