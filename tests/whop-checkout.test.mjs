@@ -4,7 +4,7 @@ process.env.NODE_ENV='test';
 process.env.DATABASE_DRIVER='pglite';
 Object.assign(process.env,{WHOP_API_KEY:' key_test ',WHOP_COMPANY_ID:' biz_test ',WHOP_PRODUCT_ID:' prod_test ',WHOP_WEBHOOK_SECRET:'secret'});
 const {db,records,balance}=await import('../server/db.mjs');
-const {createCheckout}=await import('../server/whop.mjs');
+const {createCheckout,safeProviderDiagnostic}=await import('../server/whop.mjs');
 for (const [status,code] of [[401,'AUTHENTICATION'],[403,'PERMISSIONS'],[404,'NOT_FOUND'],[422,'CONFIGURATION'],[429,'RATE_LIMIT'],[503,'PROVIDER_UNAVAILABLE']]) {
   test(`classifies Whop ${status} without leaking provider response`,async(t)=>{
     t.mock.method(globalThis,'fetch',async()=>new Response('secret echoed upstream',{status}));
@@ -35,3 +35,9 @@ test('successful unpaid checkout retains IDs and reuses session',async(t)=>{
   assert.equal((await db.prepare('SELECT COUNT(*) AS count FROM ledger').get()).count,0);
 });
 after(()=>db.close());
+
+test('provider diagnostics redact configured secrets and identifiers',()=>{
+  const result=safeProviderDiagnostic({error:{message:'Invalid key_test biz_test prod_test ws_private plan_private person@example.com https://secret.example/path'}});
+  assert.equal(result,'Invalid [redacted] [redacted] [redacted] [id] [id] [email] [url]');
+  assert.equal(safeProviderDiagnostic({error:null}),'');
+});

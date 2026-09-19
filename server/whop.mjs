@@ -13,6 +13,18 @@ import {
   balance,
 } from "./db.mjs";
 import { amount, fail, owned, role } from "./domain.mjs";
+export function safeProviderDiagnostic(body) {
+  const err = body?.error;
+  let message = typeof err === "string" ? err : typeof err?.message === "string" ? err.message : "";
+  for (const key of ["WHOP_API_KEY", "WHOP_WEBHOOK_SECRET", "WHOP_COMPANY_ID", "WHOP_PRODUCT_ID"])
+    if (process.env[key]?.trim()) message = message.split(process.env[key].trim()).join("[redacted]");
+  return message
+    .replace(/(?:https?:\/\/)[^\s]+/gi, "[url]")
+    .replace(/\b(?:apik|ws|biz|prod|plan|user|ch)_[a-zA-Z0-9_-]+/g, "[id]")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/[\r\n\t]/g, " ")
+    .slice(0, 400);
+}
 export function configured() {
   return Boolean(
     process.env.WHOP_API_KEY &&
@@ -78,9 +90,10 @@ export async function createCheckout(u, b) {
       },
     );
     if (!r.ok) {
-      // Never retain the response body: providers can echo credentials or customer data.
+      // Retain only a redacted provider explanation, never headers or the raw body.
       const error = new Error("Whop rejected checkout");
       error.providerStatus = r.status;
+      error.providerDiagnostic = safeProviderDiagnostic(await r.json().catch(() => null));
       throw error;
     }
     const body = await r.json();
@@ -108,7 +121,7 @@ export async function createCheckout(u, b) {
     p.failureCode = code;
     if (Number.isInteger(status)) p.providerStatus = status;
     await save("payment", p);
-    console.error("Whop checkout failed", { paymentId: p.id, code, status: status || null });
+    console.error("Whop checkout failed", { paymentId: p.id, code, status: status || null, diagnostic: error.providerDiagnostic || null });
     const messages = {
       AUTHENTICATION: "رفض Whop مفتاح الدفع. يجب على الإدارة مراجعة WHOP_API_KEY.",
       PERMISSIONS: "رفض Whop صلاحيات مفتاح الدفع. يجب على الإدارة تفعيل صلاحيات إنشاء جلسات الدفع والخطط للمتجر.",
