@@ -149,7 +149,7 @@ try {
     })
     .fill("1.0.0");
   await page
-    .getByLabel("وصف التطبيق")
+    .locator("textarea[name=description]")
     .fill("تطبيق بسيط لتنظيم المهام اليومية بدون أذونات حساسة.");
   await page
     .getByLabel("رابط سياسة الخصوصية")
@@ -159,7 +159,7 @@ try {
     mimeType: "application/octet-stream",
     buffer: Buffer.from([80, 75, 3, 4, 0, 0, 0, 0]),
   });
-  await page.getByLabel("الوصف المختصر",{exact:true}).fill("تنظيم المهام اليومية بسهولة");
+  await page.locator("input[name=shortDescription]").fill("تنظيم المهام اليومية بسهولة");
   await page.getByLabel("بريد الدعم الظاهر في المتجر").fill("support@example.test");
   for(const name of ['containsAds','inAppPurchases','requiresLogin','createsAccounts','collectsData']) await page.locator(`select[name=${name}]`).selectOption('no');
   await page.locator('input[name=targetAudience]').fill('18 سنة فأكثر');
