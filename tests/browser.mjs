@@ -82,6 +82,17 @@ try {
     path: "playwright-report/landing.png",
     fullPage: true,
   });
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Mobile home overflow');
+  await page.screenshot({path:'playwright-report/home-mobile.png',fullPage:true});
+  for(const route of ['/how-it-works','/pricing','/publishers','/faq','/legal/privacy']) {
+    await page.goto(base+route);
+    await page.locator('h1').waitFor();
+    assert.equal(await page.locator('h1').count(),1);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,route+' mobile overflow');
+    assert.equal(await page.locator('meta[name=robots]').getAttribute('content'),'index, follow, max-image-preview:large');
+  }
+  await page.setViewportSize({width:1440,height:1050});
   await page.goto(base + "/register?role=publisher");
   await page
     .getByRole("button", {
@@ -214,6 +225,13 @@ try {
     })
     .click();
   await login("publisher@example.test");
+  await page.goto(base + '/wallet');
+  await page.getByRole('heading',{name:'طرق سحب أرباحك'}).waitFor();
+  assert.equal(await page.locator('.crypto-method').count(),6);
+  await page.screenshot({path:'playwright-report/crypto-wallet.png',fullPage:true});
+  await page.locator('.crypto-method').filter({hasText:'Base'}).click();
+  assert.equal(await page.locator('select[name=network]').inputValue(),'USDC-BASE');
+  await page.getByRole('button',{name:'إغلاق',exact:true}).click();
   await page.goto(base + "/market");
   await page
     .getByRole("button", {

@@ -39,3 +39,10 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - name: Save browser verification screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-verification
+          path: playwright-report/*.png
+          retention-days: 3

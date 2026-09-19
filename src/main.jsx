@@ -60,6 +60,10 @@ import "@fontsource/ibm-plex-sans-arabic/500.css";
 import "@fontsource/ibm-plex-sans-arabic/600.css";
 import "@fontsource/ibm-plex-sans-arabic/700.css";
 import "./styles.css";
+import "./design.css";
+import { Brand, PublicPage, PublicFooter } from "./public-pages.jsx";
+import { publicPages, origin as siteOrigin, pageSchema } from "../shared/seo.mjs";
+import { cryptoMethods, enabledMethods, methodById, transactionUrl } from "../shared/crypto.mjs";
 import { requestJson } from "./http.mjs";
 const WhopEmbed = lazy(() =>
   import("@whop/checkout/react").then((m) => ({
@@ -131,17 +135,7 @@ function Link({ to, children, className = "", ...props }) {
     </a>
   );
 }
-function Logo() {
-  return (
-    <Link to="/" className="brand">
-      <span className="brand-mark">E</span>
-      <span>
-        eldevo<span className="brand-dot">.</span>
-        <small>منصة نشر التطبيقات</small>
-      </span>
-    </Link>
-  );
-}
+function Logo() { return <Brand Link={Link}/>; }
 function Badge({ status, children }) {
   return (
     <span className={`badge ${status}`}>
@@ -348,7 +342,24 @@ function App() {
     return () => clearInterval(timer);
   }, [user?.id]);
   useEffect(() => {
-    document.title = `${path.startsWith("/admin") ? "الإدارة" : path === "/wallet" ? "المحفظة" : "إلديفو"} — منصة نشر التطبيقات`;
+    const meta = publicPages[path];
+    document.title = meta?.title || `${path.startsWith("/admin") ? "الإدارة" : path === "/wallet" ? "المحفظة" : "مساحة العمل"} — إلديفو`;
+    const setMeta = (name, content, property = false) => {
+      const attribute = property ? "property" : "name";
+      let element = document.head.querySelector(`meta[${attribute}="${name}"]`);
+      if (!element) { element = document.createElement("meta"); element.setAttribute(attribute, name); document.head.append(element); }
+      element.content = content;
+    };
+    setMeta("description", meta?.description || "مساحة العمل الخاصة بحسابك في إلديفو.");
+    setMeta("robots", meta ? "index, follow, max-image-preview:large" : "noindex, nofollow");
+    setMeta("og:title", document.title, true);
+    setMeta("og:description", meta?.description || "مساحة العمل الخاصة بحسابك في إلديفو.", true);
+    setMeta("og:url", siteOrigin + path, true);
+    let canonical = document.head.querySelector('link[rel="canonical"]');
+    if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.append(canonical); }
+    canonical.href = siteOrigin + path;
+    document.getElementById("site-schema")?.remove();
+    if (meta) { const schema = document.createElement("script"); schema.id = "site-schema"; schema.type = "application/ld+json"; schema.textContent = JSON.stringify(pageSchema(path)); document.head.append(schema); }
   }, [path]);
   const run = async (fn) => {
     try {
@@ -362,16 +373,16 @@ function App() {
     }
   };
   const ctx = { path, go, user, data, config, refresh, toast, run };
-  if (!ready)
+  if (!ready && !publicPages[path])
     return (
       <div className="loading-screen">
-        <span className="brand-mark">E</span>
+        <img className="brand-symbol" src="/brand/eldevo-mark.webp" width="56" height="56" alt="إلديفو"/>
         <p>نجهز مساحة عملك…</p>
       </div>
     );
   return (
     <Context.Provider value={ctx}>
-      {error ? (
+      {publicPages[path] ? <PublicPage path={path} Link={Link} user={user} settings={config?.settings}/> : error ? (
         <div className="fatal">
           <h1>تعذر الاتصال بالموقع</h1>
           <p>{error}</p>
@@ -379,17 +390,14 @@ function App() {
         </div>
       ) : (
         <>
-          {path === "/" ? (
-            <Landing />
-          ) : ["/login", "/register", "/forgot", "/reset"].includes(path) ? (
+          {["/login", "/register", "/forgot", "/reset"].includes(path) ? (
             <Auth />
-          ) : path.startsWith("/legal/") ? (
-            <Legal />
+
           ) : user && data ? (
             <Shell />
-          ) : (
+          ) : /^\/(dashboard|apps|market|publisher|wallet|checkout|notifications|support|settings|admin)(\/|$)/.test(path) ? (
             <Auth />
-          )}
+          ) : <div className="fatal"><Logo/><h1>الصفحة غير موجودة</h1><Link to="/" className="button primary">العودة للرئيسية</Link></div>}
         </>
       )}
       {notification && (
@@ -401,195 +409,7 @@ function App() {
     </Context.Provider>
   );
 }
-function Landing() {
-  const { user, config } = useApp(),
-    s = config?.settings || {};
-  return (
-    <div className="landing">
-      <header className="public-nav">
-        <Logo />
-        <nav>
-          <a href="#how">كيف تعمل المنصة</a>
-          <a href="#pricing">التسعير</a>
-          <Link to="/register?role=publisher">انضم كشريك نشر</Link>
-        </nav>
-        <Link className="button dark" to={user ? "/dashboard" : "/login"}>
-          {user ? "لوحة التحكم" : "تسجيل الدخول"}
-          <ArrowUpLeft size={17} />
-        </Link>
-      </header>
-      <main>
-        <div className="landing-hero">
-          <div>
-            <span className="pill">
-              <ShieldCheck size={16} /> خطوة أوضح نحو Google Play
-            </span>
-            <h1>
-              تطبيقك جاهز.
-              <br />
-              <span>لنجد له ناشرًا.</span>
-            </h1>
-            <p>
-              اجمع فكرتك بالناشر المناسب. حدّد ميزانيتك، تابع كل خطوة، وادفع
-              مقابل نشر يمكن التحقق منه.
-            </p>
-            <div className="hero-actions">
-              <Link to="/register?role=client" className="button primary large">
-                أريد نشر تطبيقي
-                <ArrowUpLeft size={19} />
-              </Link>
-              <Link
-                to="/register?role=publisher"
-                className="button secondary large"
-              >
-                لدي حساب نشر
-              </Link>
-            </div>
-            <div className="hero-benefits">
-              <span>
-                <Check size={17} /> ميزانية تختارها
-              </span>
-              <span>
-                <Check size={17} /> محفظة وسجل واضح
-              </span>
-              <span>
-                <Check size={17} /> مراجعة قبل النشر
-              </span>
-            </div>
-          </div>
-          <div className="journey-card">
-            <div className="journey-top">
-              <span className="mini-brand">E</span>
-              <span>رحلة تطبيقك</span>
-              <Badge status="active">خطوة بخطوة</Badge>
-            </div>
-            {[
-              [
-                "01",
-                "قدّم تطبيقك",
-                "بيانات واضحة وملف جاهز للفحص",
-                UploadCloud,
-              ],
-              [
-                "02",
-                "اختر شريك النشر",
-                "أنت تحدد الميزانية والناشر يوافق",
-                Users,
-              ],
-              ["03", "تابع حتى النشر", "محادثة، تسليم، وتحقق من المتجر", Globe],
-            ].map(([n, title, desc, Icon], i) => (
-              <div
-                className={`journey-step ${i === 1 ? "highlight" : ""}`}
-                key={n}
-              >
-                <div className="step-icon">
-                  <Icon size={24} />
-                </div>
-                <div>
-                  <small>الخطوة {n}</small>
-                  <h3>{title}</h3>
-                  <p>{desc}</p>
-                </div>
-                <CheckCircle2 size={22} />
-              </div>
-            ))}
-            <div className="journey-bottom">
-              <LockKeyhole size={18} /> لا نطلب كلمة مرور حساب Google الخاص بك
-            </div>
-          </div>
-        </div>
-        <div className="landing-strip">
-          <span>مصمم لرحلة نشر واضحة</span>
-          <strong>
-            <Smartphone size={20} /> Android apps
-          </strong>
-          <strong>
-            <ShieldCheck size={20} /> مراجعة بشرية
-          </strong>
-          <strong>
-            <CreditCard size={20} /> دفع عبر Whop
-          </strong>
-          <strong>
-            <Coins size={20} /> سحب رقمي للناشرين
-          </strong>
-        </div>
-        <section id="how" className="how-section">
-          <span className="eyebrow">كل طرف يعرف خطوته التالية</span>
-          <h2>مساحة واحدة. طرفان. اتفاق واضح.</h2>
-          <div className="two-column">
-            <div className="role-feature">
-              <Code2 />
-              <h3>لديك تطبيق تريد نشره؟</h3>
-              <p>
-                ارفع تطبيقك وميزانيتك، استقبل عروض الناشرين المعتمدين، وراجع
-                النتيجة قبل انتهاء مهلة الاعتراض.
-              </p>
-              <Link to="/register?role=client">
-                ابدأ كصاحب تطبيق <ArrowLeft size={18} />
-              </Link>
-            </div>
-            <div className="role-feature dark-feature">
-              <Store />
-              <h3>لديك حساب Google Play؟</h3>
-              <p>
-                اختر التطبيقات التي تناسب حسابك، اطلع على تفاصيلها، وانشر بعد
-                الاتفاق. تابع أرباحك واطلب سحبها.
-              </p>
-              <Link to="/register?role=publisher">
-                انضم كشريك نشر <ArrowLeft size={18} />
-              </Link>
-            </div>
-          </div>
-        </section>
-        <section id="pricing" className="pricing">
-          <div>
-            <span className="eyebrow">أنت تختار الميزانية</span>
-            <h2>
-              سعر واضح.
-              <br />
-              من أول خطوة.
-            </h2>
-            <p>
-              الحد الأدنى للنشر {money(s.minPublishBudget)}.<br />
-              عمولة المنصة {(s.commissionBps || 0) / 100}% من ميزانية النشر.
-            </p>
-          </div>
-          <div className="price-box">
-            <span>فحص التطبيق</span>
-            <strong>{money(s.reviewFee)}</strong>
-            <p>
-              مراجعة بشرية وقرار موثق. رسم الفحص منفصل ويستحق بعد تسليم التقرير.
-            </p>
-            <hr />
-            <span>ميزانية النشر</span>
-            <strong>ابتداءً من {money(s.minPublishBudget)}</strong>
-            <p>
-              تبقى محجوزة حتى التحقق وانتهاء مهلة الاعتراض. لا ضمان لقبول
-              Google.
-            </p>
-            <Link className="button primary" to="/register?role=client">
-              أنشئ طلب نشر <ArrowLeft size={17} />
-            </Link>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </div>
-  );
-}
-function Footer() {
-  return (
-    <footer>
-      <Logo />
-      <span>© {new Date().getFullYear()} إلديفو</span>
-      <div>
-        <Link to="/legal/terms">الشروط</Link>
-        <Link to="/legal/privacy">الخصوصية</Link>
-        <Link to="/legal/refunds">الاسترداد</Link>
-      </div>
-    </footer>
-  );
-}
+function Footer() { return <PublicFooter Link={Link}/>; }
 function Auth() {
   const { path, go, refresh } = useApp();
   const register = path === "/register",
@@ -2060,10 +1880,13 @@ function AppDetail({ id }) {
 function WalletPage() {
   const { data, user, go } = useApp(),
     [modal, setModal] = useState(false),
+    [network, setNetwork] = useState(enabledMethods(data.settings)[0]?.id || ""),
     [withdrawAmount, setWithdrawAmount] = useState(
       data.settings.minWithdrawal / 100,
     );
   const s = data.settings,
+    methods = enabledMethods(s),
+    selectedMethod = methodById(network),
     fee =
       s.withdrawFee +
       Math.ceil((Number(withdrawAmount) * 100 * s.withdrawBps) / 10000);
@@ -2078,7 +1901,7 @@ function WalletPage() {
               <Plus size={18} /> إضافة رصيد
             </Link>
           ) : user.role === "publisher" ? (
-            <Button icon={ArrowUpLeft} onClick={() => setModal(true)}>
+            <Button icon={ArrowUpLeft} disabled={!methods.length} onClick={() => setModal(true)}>
               طلب سحب
             </Button>
           ) : null
@@ -2122,11 +1945,17 @@ function WalletPage() {
           </p>
           <small>
             {user.role === "publisher"
-              ? "USDT / TRC20 · USDC / Polygon"
+              ? `${methods.length} خيارات متاحة · USDT / USDC`
               : "رصيد الخدمات لا يُسحب إلى محفظة رقمية."}
           </small>
         </div>
       </div>
+      {user.role === "publisher" && <Section title="طرق سحب أرباحك" subtitle="اختر العملة والشبكة التي تدعمها محفظتك. تنفذ الإدارة التحويل بعد مراجعة الطلب.">
+        {methods.length ? <div className="crypto-grid">{methods.map(m => <button type="button" className="crypto-method" key={m.id} onClick={() => {setNetwork(m.id);setModal(true);}}>
+          <span className={`coin-symbol ${m.asset.toLowerCase()}`}>{m.asset === "USDT" ? "₮" : "$"}</span><div><strong>{m.asset}</strong><small>{m.label}</small></div><ArrowUpLeft size={18}/>
+        </button>)}</div> : <Notice>طلبات السحب متوقفة مؤقتاً. تواصل مع الدعم.</Notice>}
+        <div className="crypto-caption"><ShieldCheck size={16}/> الحد الأدنى {money(s.minWithdrawal)} · الرسوم {money(s.withdrawFee)} + {s.withdrawBps / 100}% · الصافي يظهر قبل التأكيد</div>
+      </Section>}
       <Section
         title="سجل المعاملات"
         subtitle="كل إضافة أو حجز أو تسوية تظهر هنا"
@@ -2221,9 +2050,9 @@ function WalletPage() {
                     الكمية المحولة: {w.cryptoAmount} {w.network.split("-")[0]}
                   </small>
                 )}
-                {w.status === "paid" && (
+                {w.status === "paid" && transactionUrl(w.network, w.adminReference) && (
                   <a
-                    href={`${w.network === "USDT-TRC20" ? "https://tronscan.org/#/transaction/" : "https://polygonscan.com/tx/"}${w.adminReference}`}
+                    href={transactionUrl(w.network, w.adminReference)}
                     target="_blank"
                     rel="noreferrer"
                     className="text-link"
@@ -2265,9 +2094,8 @@ function WalletPage() {
               />
             </Field>
             <Field label="العملة والشبكة">
-              <select name="network">
-                <option value="USDT-TRC20">USDT — شبكة TRON (TRC20)</option>
-                <option value="USDC-POLYGON">USDC — شبكة Polygon</option>
+              <select name="network" value={network} onChange={e => setNetwork(e.target.value)} required>
+                {methods.map(m => <option key={m.id} value={m.id}>{m.asset} — {m.label}</option>)}
               </select>
             </Field>
             <Field
@@ -2276,7 +2104,8 @@ function WalletPage() {
               dir="ltr"
               required
               autoComplete="off"
-              placeholder="أدخل عنوان الشبكة المحددة"
+              placeholder={selectedMethod?.address || "عنوان المحفظة"}
+              hint={`تأكد أن محفظتك تستقبل ${selectedMethod?.asset || "العملة"} على شبكة ${selectedMethod?.chain || "السحب المختارة"}. عنوان EVM وحده لا يحدد الشبكة.`}
             />
             <div className="invoice-mini">
               <div className="summary-row">
@@ -2286,7 +2115,7 @@ function WalletPage() {
                 </strong>
               </div>
               <div className="summary-row">
-                <span>رسوم الخدمة والشبكة المحددة</span>
+                <span>رسوم السحب المعلنة</span>
                 <strong>{money(fee)}</strong>
               </div>
               <div className="summary-row total">
@@ -3054,7 +2883,7 @@ function Admin() {
                   <span>صافي مستهدف</span>
                   <strong>{money(selected.net)}</strong>
                 </div>
-                <p>{selected.network}</p>
+                <p><strong>{methodById(selected.network)?.asset}</strong> · {methodById(selected.network)?.label || selected.network}</p>
                 <code>{selected.address}</code>
               </div>
               {selected.status === "pending" ? (
@@ -3083,7 +2912,7 @@ function Admin() {
                     name="cryptoAmount"
                     type="number"
                     min="0"
-                    step="0.000001"
+                    step="0.00000001"
                   />
                   <Notice>
                     تحقق من الشبكة والعنوان ونفذ التحويل خارج الموقع قبل تسجيله
@@ -3160,6 +2989,7 @@ function AdminSettings() {
               holdHours: Number(b.holdHours),
               supportEmail: b.supportEmail,
               maintenance: b.maintenance === "on",
+              withdrawalNetworks: cryptoMethods.filter(m => b[`network_${m.id}`] === "on").map(m => m.id),
             };
             return api("/admin/settings", payload);
           }}
@@ -3211,6 +3041,7 @@ function AdminSettings() {
               defaultValue={s.supportEmail}
             />
           </div>
+          <fieldset className="network-settings"><legend>شبكات السحب المتاحة</legend><p className="muted">فعّل الشبكات التي تستطيع تنفيذ التحويل عليها. تعطيل شبكة يمنع الطلبات الجديدة فقط. إلغاء تفعيل الجميع يوقف طلبات السحب الجديدة.</p><div className="network-settings-grid">{cryptoMethods.map(m => <label className="checkbox" key={m.id}><input type="checkbox" name={`network_${m.id}`} defaultChecked={enabledMethods(s).some(n => n.id === m.id)}/><span><strong>{m.asset}</strong><small>{m.label}</small></span></label>)}</div></fieldset>
           <label className="checkbox">
             <input
               name="maintenance"
@@ -3226,108 +3057,6 @@ function AdminSettings() {
         </ActionForm>
       </Section>
     </>
-  );
-}
-function Legal() {
-  const { path } = useApp();
-  const privacy = path.endsWith("privacy"),
-    refund = path.endsWith("refunds");
-  return (
-    <div className="legal-page">
-      <header className="public-nav">
-        <Logo />
-        <Link to="/" className="button secondary">
-          الرئيسية
-        </Link>
-      </header>
-      <article>
-        <span className="eyebrow">سياسات إلديفو</span>
-        <h1>
-          {privacy
-            ? "سياسة الخصوصية"
-            : refund
-              ? "المدفوعات والاسترداد"
-              : "شروط استخدام المنصة"}
-        </h1>
-        {privacy ? (
-          <>
-            <h2>البيانات التي نستخدمها</h2>
-            <p>
-              نحفظ الاسم والبريد وبيانات الطلبات والمراسلات وسجل الأموال وملفات
-              التطبيقات وعناوين السحب. تُخزن كلمات المرور بصورة مشتقة آمنة، ولا
-              نستقبل بيانات بطاقتك البنكية.
-            </p>
-            <h2>من يمكنه الوصول</h2>
-            <p>
-              تفاصيل الطلب الخاصة تظهر لصاحب الطلب والناشر المختار والإدارة.
-              ملفات التطبيقات محفوظة خارج الملفات العامة، والتنزيل يتطلب صلاحية.
-              يرى الناشرون المعتمدون ملخص التطبيقات المفتوحة فقط.
-            </p>
-            <h2>الدفع وحقوقك</h2>
-            <p>
-              يعالج Whop بيانات الدفع ضمن شروطه. يمكنك طلب تصحيح بياناتك أو حذف
-              حسابك عبر الدعم؛ قد يلزم الاحتفاظ بسجلات المعاملات والنزاعات وفق
-              متطلبات التشغيل والقانون.
-            </p>
-          </>
-        ) : refund ? (
-          <>
-            <h2>الفحص والنشر</h2>
-            <p>
-              يُحجز رسم الفحص عند تقديم التطبيق ويستحق عند إصدار التقرير، حتى
-              عند رفض التطبيق. إذا ألغت الإدارة الفحص قبل تنفيذه يُعاد المحجوز
-              لرصيد الخدمات. تُحجز ميزانية النشر عند اختيار الناشر، وتُسوّى بعد
-              التحقق ومهلة الاعتراض المبيّنة في الطلب.
-            </p>
-            <h2>الاسترداد والنزاع</h2>
-            <p>
-              افتح النزاع قبل انتهاء مهلة الاعتراض لتجميد التسوية. إعادة الرصيد
-              داخل الموقع تختلف عن الاسترداد إلى وسيلة الدفع الأصلية؛ الأخير
-              يطلب عبر الدعم ويعالج من خلال Whop وفق الحالة والرسوم المطبقة.
-            </p>
-            <h2>السحب الرقمي</h2>
-            <p>
-              السحب متاح لأرباح الناشرين فقط. تظهر الشبكة والرسوم والصافي قبل
-              التأكيد، ويُحجز المبلغ حتى التنفيذ أو الرفض. يجب التأكد من العنوان
-              والشبكة؛ معاملات الشبكات المكتملة لا يمكن إلغاؤها من المنصة.
-            </p>
-          </>
-        ) : (
-          <>
-            <h2>طبيعة الخدمة</h2>
-            <p>
-              إلديفو وسيط لخدمات نشر التطبيقات. صاحب التطبيق يصرح بامتلاكه
-              الحقوق وبصحة وصف البيانات والأذونات. الناشر يراجع الطلب ويقرر
-              قبوله ويتحمل مسؤوليات حسابه أمام Google. المنصة غير تابعة لـ
-              Google ولا تضمن قبول التطبيق أو استمراره في المتجر.
-            </p>
-            <h2>الفحص والتحقق</h2>
-            <p>
-              فحص التطبيقات بشري ويشمل الملفات والمحتوى وفق إجراءات الإدارة؛ لا
-              يعد ضمانًا بخلو التطبيق من كل عيب. التحقق العام يعتمد صفحة المتجر
-              وهوية الناشر الظاهرة، ولا يثبت مطابقة الملف المنشور أو ملكية حساب
-              Google القانونية.
-            </p>
-            <h2>الاتفاق والتسوية</h2>
-            <p>
-              تبقى الأسعار والعمولة محفوظة في كل طلب. رصيد الخدمات سجل داخلي
-              وليس حسابًا مصرفيًا. تواصل داخل الطلب ووثق أي تغيير في النطاق. لا
-              تستخدم المنصة للتحايل على إغلاق الحسابات أو لنشر تطبيقات مخالفة.
-            </p>
-            <h2>التعليق والدعم</h2>
-            <p>
-              يمكن تعليق الحساب عند نزاع دفع أو إساءة استخدام. تُراجع النزاعات
-              بالأدلة وتُسجّل القرارات. تُحدَّث بيانات الجهة المشغلة ووسائل
-              التواصل قبل استقبال مدفوعات حقيقية.
-            </p>
-          </>
-        )}
-        <Link to="/support" className="button primary">
-          تواصل مع الدعم
-        </Link>
-      </article>
-      <Footer />
-    </div>
   );
 }
 createRoot(document.getElementById("root")).render(<App />);

@@ -1,3 +1,4 @@
+import { cryptoMethods, enabledMethods, methodById, validAddress, validTransaction } from "../shared/crypto.mjs";
 import { randomBytes } from "node:crypto";
 import {
   db,
@@ -607,14 +608,10 @@ export async function withdraw(u, b) {
     const s = await settings();
     if (amount(b.amount) < s.minWithdrawal)
       fail("المبلغ أقل من الحد الأدنى للسحب");
-    if (!["USDT-TRC20", "USDC-POLYGON"].includes(b.network))
+    if (!enabledMethods(s).some(m => m.id === b.network))
       fail("شبكة غير مدعومة");
     const address = text(b.address, 20, 100);
-    if (
-      b.network === "USDT-TRC20"
-        ? !/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)
-        : !/^0x[0-9a-fA-F]{40}$/.test(address)
-    )
+    if (!validAddress(b.network, address))
       fail("عنوان المحفظة لا يطابق الشبكة");
     if (b.confirmed !== true) fail("أكد العنوان والشبكة");
     const fee = s.withdrawFee + Math.ceil((b.amount * s.withdrawBps) / 10000);
@@ -714,6 +711,10 @@ export async function adminAction(u, kind, key, b) {
           )
             fail("مهلة الاعتراض بين 24 و336 ساعة");
           s.holdHours = b.holdHours;
+        }
+        if (b.withdrawalNetworks !== undefined) {
+          if (!Array.isArray(b.withdrawalNetworks) || b.withdrawalNetworks.some(id => !cryptoMethods.some(m => m.id === id))) fail("شبكات السحب غير صالحة");
+          s.withdrawalNetworks = [...new Set(b.withdrawalNetworks)];
         }
         for (const k of ["depositInstructions", "supportEmail"])
           if (b[k] !== undefined) s[k] = text(b[k], 0, 3000);
@@ -855,12 +856,12 @@ export async function adminAction(u, kind, key, b) {
           r.cryptoAmount = quantity;
           if (!(await activeUser(r.owner)))
             fail("الحساب معلق ولا يمكن تنفيذ السحب");
-          if (!/^(0x)?[0-9a-fA-F]{64}$/.test(r.adminReference))
+          if (!validTransaction(r.network, r.adminReference))
             fail("أدخل معرّف معاملة blockchain صالحًا");
           if (
             (await records("withdrawal")).some(
               (w) =>
-                w.status === "paid" && w.adminReference === r.adminReference,
+                w.status === "paid" && methodById(w.network)?.chain === methodById(r.network)?.chain && w.adminReference?.toLowerCase() === r.adminReference.toLowerCase(),
             )
           )
             fail("مرجع التحويل مستخدم");

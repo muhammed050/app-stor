@@ -1,3 +1,4 @@
+import { publicPages } from "../shared/seo.mjs";
 import { appOrigin } from "./config.mjs";
 import {
   beginUpload,
@@ -466,8 +467,12 @@ export async function handler(req, res) {
     const root = resolve("dist");
     let file = resolve(root, `.${decodeURIComponent(path)}`);
     if (!file.startsWith(root + "/") && file !== root) d.fail("غير مسموح", 403);
-    if (!existsSync(file) || !statSync(file).isFile())
-      file = resolve(root, "index.html");
+    const publicPage = Object.hasOwn(publicPages, path);
+    const privatePage = /^\/(dashboard|apps|market|publisher|wallet|checkout|notifications|support|settings|admin|login|register|forgot|reset)(\/|$)/.test(path);
+    let responseStatus = 200;
+    if (publicPage) file = resolve(root, `.${path}/index.html`);
+    else if (privatePage) { file = resolve(root, "app.html"); res.setHeader("X-Robots-Tag", "noindex, nofollow"); }
+    else if (!existsSync(file) || !statSync(file).isFile()) { file = resolve(root, "404.html"); responseStatus = 404; res.setHeader("X-Robots-Tag", "noindex, nofollow"); }
     if (!existsSync(file))
       return json(res, 503, {
         error: "شغل npm run build أولًا أو افتح منفذ التطوير 5173",
@@ -477,9 +482,13 @@ export async function handler(req, res) {
       ".js": "text/javascript; charset=utf-8",
       ".css": "text/css; charset=utf-8",
       ".svg": "image/svg+xml",
+      ".png": "image/png",
+      ".webp": "image/webp",
+      ".xml": "application/xml; charset=utf-8",
+      ".txt": "text/plain; charset=utf-8",
       ".woff2": "font/woff2",
     };
-    res.writeHead(200, {
+    res.writeHead(responseStatus, {
       "Content-Type": types[extname(file)] || "application/octet-stream",
       "Cache-Control":
         extname(file) === ".html" ? "no-cache" : "public, max-age=3600",
