@@ -1,3 +1,4 @@
+import { rootCertificates } from "node:tls";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -57,7 +58,9 @@ if (embedded) {
             rejectUnauthorized: true,
             ...(process.env.SUPABASE_DB_CA
               ? { ca: process.env.SUPABASE_DB_CA.replace(/\\n/g, "\n") }
-              : {}),
+              : /\.supabase\.(co|com)$/.test(url.hostname)
+                ? { ca: [...rootCertificates, readFileSync(new URL("./certs/supabase-root-2021.crt", import.meta.url), "utf8")] }
+                : {}),
           },
     max: 5,
     connectionTimeoutMillis: 10000,
