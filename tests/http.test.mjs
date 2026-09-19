@@ -206,6 +206,12 @@ test("durable chunk upload enforces ownership, completion and exact download", a
   });
   assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
 });
+test("email administration and cron cannot be accessed by ordinary users",async()=>{
+ assert.equal((await req('/admin/email/process',{},client)).status,403);
+ assert.equal((await req('/admin/email/retry',{id:'email:fake'},client)).status,403);
+ assert.equal((await req('/jobs/email',{},client)).status,401);
+ const me=await req('/state',undefined,client);assert.equal(me.status,200);assert.equal(me.body.email,undefined);
+});
 test("logout invalidates session", async () => {
   assert.equal((await req("/logout", {}, client)).status, 200);
   assert.equal((await req("/state", undefined, client)).status, 401);

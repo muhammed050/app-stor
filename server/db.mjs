@@ -1,3 +1,4 @@
+import {queueRecordEmails} from "./email.mjs";
 import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -24,17 +25,18 @@ export async function records(kind) {
   ).map((r) => JSON.parse(r.body));
 }
 export async function save(kind, value) {
-  const v = {
-    ...value,
-  };
-  v.id ||= id();
-  v.createdAt ||= now();
-  await db
-    .prepare(
-      "INSERT INTO records VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body",
-    )
-    .run(v.id, kind, v.owner || "system", JSON.stringify(v), v.createdAt);
-  return v;
+  return atomic(async()=>{
+    const v = {...value};
+    v.id ||= id();
+    v.createdAt ||= now();
+    const tracked = ["app","update","publisher","payment","withdrawal"].includes(kind);
+    const previous = tracked ? await record(v.id) : null;
+    if(tracked) v.emailRevision = (previous?.emailRevision || 0) + (previous?.status !== v.status ? 1 : 0);
+    await db.prepare("INSERT INTO records VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body")
+      .run(v.id, kind, v.owner || "system", JSON.stringify(v), v.createdAt);
+    if(tracked) await queueRecordEmails(kind,previous,v);
+    return v;
+  });
 }
 export async function balance(userId) {
   const r = await db

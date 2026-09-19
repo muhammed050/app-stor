@@ -1,3 +1,4 @@
+import {emailConfiguration, queueEmail, processEmails, retryEmail} from "./email.mjs";
 import { publicPages } from "../shared/seo.mjs";
 import { appOrigin } from "./config.mjs";
 import {
@@ -81,23 +82,6 @@ async function body(req, max = 100000) {
     chunks.push(c);
   }
   return Buffer.concat(chunks).toString("utf8");
-}
-async function mail(to, subject, message) {
-  if (!process.env.EMAIL_WEBHOOK_URL) return false;
-  const r = await fetch(process.env.EMAIL_WEBHOOK_URL, {
-    method: "POST",
-    signal: AbortSignal.timeout(10000),
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.EMAIL_WEBHOOK_TOKEN || ""}`,
-    },
-    body: JSON.stringify({
-      to,
-      subject,
-      text: message,
-    }),
-  });
-  return r.ok;
 }
 function sameOrigin(req) {
   if (req.headers.origin && !allowedOrigins.has(req.headers.origin))
@@ -210,7 +194,7 @@ export async function handler(req, res) {
     res.setHeader("Strict-Transport-Security", "max-age=31536000");
     res.setHeader(
       "Content-Security-Policy",
-      "default-src 'self'; script-src 'self' https://whop.com https://*.whop.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; connect-src 'self' https://whop.com https://*.whop.com; frame-src https://whop.com https://*.whop.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+      "default-src 'self'; script-src 'self' https://whop.com https://*.whop.com; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https://whop.com https://*.whop.com; frame-src https://whop.com https://*.whop.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
     );
   }
   try {
@@ -226,6 +210,10 @@ export async function handler(req, res) {
         await applyEvent(verifySignature(raw, req.headers)),
       );
     }
+    if(path === "/api/jobs/email" && method === "POST") {
+      await authorizeJob(req);
+      return json(res,200,await processEmails());
+    }
     if (path === "/api/jobs/verify" && method === "POST") {
       await authorizeJob(req);
       return json(res, 200, await runSweep());
@@ -239,7 +227,7 @@ export async function handler(req, res) {
       return json(res, 200, {
         settings: await settings(),
         whopConfigured: configured(),
-        emailConfigured: Boolean(process.env.EMAIL_WEBHOOK_URL),
+        emailConfigured: emailConfiguration().configured,
       });
     const session = await sessionFor(req),
       u = session
@@ -300,7 +288,7 @@ export async function handler(req, res) {
       if (path.endsWith("/forgot")) {
         const email = d.text(b.email, 5, 250).toLowerCase();
         await limit(`reset:${email}`, 3, 3600000);
-        if (!process.env.EMAIL_WEBHOOK_URL)
+        if (!emailConfiguration().configured)
           d.fail(
             "استعادة كلمة المرور بالبريد غير مفعلة. تواصل مع إدارة الموقع.",
             503,
@@ -310,23 +298,10 @@ export async function handler(req, res) {
           .get(email);
         if (user) {
           const token = randomBytes(32).toString("hex");
-          await db
-            .prepare("INSERT INTO resets VALUES(?,?,?)")
-            .run(digest(token), user.id, Date.now() + 1800000);
-          try {
-            await mail(
-              email,
-              "استعادة كلمة مرور إلديفو",
-              `${origin}/reset?token=${token}`,
-            );
-          } catch {
-            await audit(
-              "system",
-              "email.failed",
-              user.id,
-              "reset delivery failed",
-            );
-          }
+          await atomic(async()=>{
+            await db.prepare("INSERT INTO resets VALUES(?,?,?)").run(digest(token), user.id, Date.now()+1800000);
+            await queueEmail({owner:user.id,key:`reset:${digest(token)}`,subject:"استعادة كلمة مرور Dorucenie",message:"وصلنا طلب تغيير كلمة مرور حسابك. الرابط صالح لمدة 30 دقيقة. إذا لم تطلب ذلك فتجاهل الرسالة.",path:`/reset?token=${token}`,expiresAt:Date.now()+1800000});
+          });
         }
         return json(res, 200, {
           message: "إذا كان البريد مسجلًا، ستصلك رسالة الاستعادة.",
@@ -358,6 +333,16 @@ export async function handler(req, res) {
         d.fail("انتهت صلاحية الطلب. حدّث الصفحة.", 403);
       if ((await settings()).maintenance && u.role !== "admin" && mutation)
         d.fail("المنصة قيد الصيانة. يرجى المحاولة لاحقًا.", 503);
+      if(path === "/api/admin/email/process" && method === "POST") {
+        if(u.role!=="admin")d.fail("غير مسموح",403);
+        await limit(`email-process:${u.id}`,5,60000);
+        return json(res,200,await processEmails());
+      }
+      if(path === "/api/admin/email/retry" && method === "POST") {
+        if(u.role!=="admin")d.fail("غير مسموح",403);
+        await retryEmail(JSON.parse(await body(req)).id,u.id);
+        return json(res,200,{ok:true});
+      }
       if (path === "/api/state") return json(res, 200, await d.state(u));
       if (path.startsWith("/api/files/") && method === "GET")
         return await download(res, u, path.split("/").pop());

@@ -2590,7 +2590,7 @@ function Admin() {
               <Badge status={data.whopConfigured ? "approved" : "pending"} />
             </div>
             <div className="list-row">
-              <span>بريد استعادة الحساب</span>
+              <span>الإيميلات التلقائية واستعادة الحساب</span>
               <Badge status={data.emailConfigured ? "approved" : "pending"} />
             </div>
             <div className="list-row">
@@ -2607,6 +2607,13 @@ function Admin() {
             </Notice>
           </Section>
         </div>
+        <Section title="الإيميلات التلقائية" subtitle="رسائل التسجيل واعتماد الناشر وحالة الطلب والدفع والسحب">
+          {!data.email?.configured && <Notice>الإرسال غير مفعّل. أضف RESEND_API_KEY وEMAIL_FROM في إعدادات Production على Vercel، وفعّل نطاق المرسل لدى Resend. الرسائل الجديدة تبقى في الانتظار لمدة تصل إلى 7 أيام.</Notice>}
+          <p>قَبِلها المزوّد: {data.email?.counts?.accepted || 0} · بانتظار الإرسال: {(data.email?.counts?.pending || 0)+(data.email?.counts?.retry || 0)+(data.email?.counts?.sending || 0)} · فشلت: {data.email?.counts?.failed || 0} · انتهت صلاحيتها: {data.email?.counts?.expired || 0}</p>
+          <p className="muted">المعالجة تلقائية كل دقيقة. قبول مزوّد البريد لا يؤكد وصول الرسالة إلى صندوق الوارد.</p>
+          <Button disabled={!data.email?.configured} onClick={()=>run(()=>api('/admin/email/process',{}))}>معالجة الرسائل المنتظرة الآن</Button>
+          {!!data.email?.recent?.length && <div className="table-wrap"><table><thead><tr><th>البريد</th><th>الموضوع</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>{data.email.recent.map(e=><tr key={e.id}><td dir="ltr">{e.recipient}</td><td>{e.subject}</td><td>{{pending:'بانتظار الإرسال',retry:'إعادة محاولة',sending:'جارٍ الإرسال',accepted:'قَبِلها المزوّد',failed:'فشل الإرسال',expired:'انتهت الصلاحية'}[e.status]}{e.error&&<small> — {e.error}</small>}</td><td>{e.status==='failed'&&<Button variant="secondary" onClick={()=>run(()=>api('/admin/email/retry',{id:e.id}))}>إعادة المحاولة</Button>}</td></tr>)}</tbody></table></div>}
+        </Section>
         <Section title="أحدث الطلبات">
           {data.apps.length ? (
             <AppTable apps={data.apps.slice(0, 6)} />

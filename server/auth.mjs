@@ -1,3 +1,4 @@
+import {queueEmail} from "./email.mjs";
 import {
   randomBytes,
   scryptSync,
@@ -31,9 +32,10 @@ export async function createUser({ name, email, password, role }) {
     status: "active",
     created_at: now(),
   };
-  await db
-    .prepare("INSERT INTO users VALUES(?,?,?,?,?,?,?)")
-    .run(...Object.values(user));
+  await atomic(async()=>{
+    await db.prepare("INSERT INTO users VALUES(?,?,?,?,?,?,?)").run(...Object.values(user));
+    if(role!=="admin")await queueEmail({owner:user.id,key:`welcome:${user.id}`,subject:"أهلًا بك في Dorucenie",message:role==='publisher'?"تم إنشاء حسابك كناشر. أكمل ملف حساب النشر لبدء إجراءات الاعتماد.":"تم إنشاء حسابك. يمكنك تجهيز تطبيقك وملفات المتجر وإرسال طلب نشر من لوحة التحكم.",path:role==='publisher'?'/publisher':'/dashboard'});
+  });
   return cleanUser(user);
 }
 export async function sessionFor(req) {

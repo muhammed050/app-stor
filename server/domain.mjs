@@ -1,3 +1,4 @@
+import {emailConfiguration, emailSummary} from "./email.mjs";
 import {validateListing} from "./listing.mjs";
 import { cryptoMethods, enabledMethods, methodById, validAddress, validTransaction } from "../shared/crypto.mjs";
 import { randomBytes } from "node:crypto";
@@ -173,7 +174,8 @@ export async function state(u) {
             .all()
         : [],
       platformBalance: admin ? await balance("platform") : undefined,
-      emailConfigured: Boolean(process.env.EMAIL_WEBHOOK_URL),
+      emailConfigured: emailConfiguration().configured,
+      email: admin ? await emailSummary() : undefined,
       whopConfigured: Boolean(
         process.env.WHOP_API_KEY &&
         process.env.WHOP_COMPANY_ID &&

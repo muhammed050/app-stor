@@ -1,0 +1,9 @@
+const escape = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function emailContent({name,subject,message,path='/dashboard'}) {
+ const origin='https://dorucenie.com';
+ const url=new URL(path,origin);
+ if(url.origin!==origin)throw new Error('Invalid email link');
+ const text=`مرحبًا ${name || ''}\n\n${message}\n\nعرض التفاصيل: ${url.href}\n\nDorucenie — إشعار متعلق بحسابك، لا يتطلب الرد على هذا البريد.`;
+ const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:#f3f6fa;font-family:Tahoma,Arial,sans-serif;color:#10243a"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:32px 12px"><table role="presentation" width="560" style="width:100%;max-width:560px;background:white;border:1px solid #e0e7ef;border-radius:16px" cellspacing="0" cellpadding="0"><tr><td style="background:#10243a;padding:28px;color:white"><a href="${origin}" style="color:white;text-decoration:none;font:bold 26px Arial" dir="ltr">dorucenie<span style="color:#63dbaf">.com</span></a></td></tr><tr><td style="padding:30px;text-align:right;line-height:1.9"><h1 style="font-size:22px">${escape(subject)}</h1><p>مرحبًا ${escape(name)}،</p><p style="white-space:pre-line">${escape(message)}</p><p style="margin:28px 0"><a href="${escape(url.href)}" style="background:#087f65;color:white;padding:13px 24px;border-radius:8px;text-decoration:none;display:inline-block">عرض التفاصيل</a></p><p style="font-size:12px;color:#63778a">هذا إشعار تلقائي متعلق بحسابك على Dorucenie. يمكنك متابعة التفاصيل من داخل الموقع.</p></td></tr></table></td></tr></table></body></html>`;
+ return {html,text};
+}
