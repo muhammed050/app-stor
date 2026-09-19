@@ -229,14 +229,25 @@ function Modal({ title, children, onClose }) {
     const old = document.body.style.overflow;
     const opener = document.activeElement;
     document.body.style.overflow = "hidden";
-    const focusable = () => [...document.querySelectorAll('.modal button:not([disabled]), .modal input:not([disabled]), .modal select, .modal textarea, .modal a[href]')];
+    const focusable = () => [
+      ...document.querySelectorAll(
+        ".modal button:not([disabled]), .modal input:not([disabled]), .modal select, .modal textarea, .modal a[href]",
+      ),
+    ];
     focusable()[0]?.focus();
     const handler = (e) => {
       if (e.key === "Escape") onClose();
       if (e.key === "Tab") {
-        const items = focusable(), first = items[0], last = items.at(-1);
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+        const items = focusable(),
+          first = items[0],
+          last = items.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
     document.addEventListener("keydown", handler);
@@ -1228,16 +1239,28 @@ function Apps() {
 }
 async function uploadFile(file, kind = "app") {
   if (!file || !file.size) throw new Error("اختر الملف أولًا");
-  return requestJson("/api/upload", {
-    method: "POST",
-    headers: {
-      "X-CSRF-Token": csrf,
-      "X-File-Name": encodeURIComponent(file.name),
-      "X-Upload-Kind": kind,
-    },
-    body: file,
+  const upload = await api("/uploads", {
+    name: file.name,
+    size: file.size,
+    kind,
   });
+  for (
+    let offset = 0, part = 0;
+    offset < file.size;
+    offset += upload.chunkSize, part++
+  ) {
+    await requestJson(`/api/uploads/${upload.id}/parts/${part}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "X-CSRF-Token": csrf,
+      },
+      body: file.slice(offset, offset + upload.chunkSize),
+    });
+  }
+  return api(`/uploads/${upload.id}/finish`, {});
 }
+
 function NewApp() {
   const { data, user, go } = useApp();
   const [budget, setBudget] = useState(data.settings.minPublishBudget / 100);

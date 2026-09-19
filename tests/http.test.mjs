@@ -147,6 +147,58 @@ test("upload is private, rejects wrong file signatures and isolates owner", asyn
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("content-type"), "application/octet-stream");
 });
+test("durable chunk upload enforces ownership, completion and exact download", async () => {
+  const bytes = Buffer.alloc(2 * 1024 * 1024 + 32, 7);
+  Buffer.from([80, 75, 3, 4]).copy(bytes);
+  const start = await req(
+    "/uploads",
+    { name: "durable.aab", kind: "app", size: bytes.length },
+    client,
+  );
+  assert.equal(start.status, 201);
+  const upload = start.body;
+  assert.equal(
+    (await req(`/uploads/${upload.id}/finish`, {}, client)).status,
+    400,
+  );
+  const put = async (part, data, session = client) =>
+    fetch(base + `/api/uploads/${upload.id}/parts/${part}`, {
+      method: "POST",
+      headers: {
+        cookie: session.cookie,
+        "X-CSRF-Token": session.csrf,
+        "Content-Type": "application/octet-stream",
+      },
+      body: data,
+    });
+  assert.equal(
+    (await put(0, bytes.subarray(0, upload.chunkSize), other)).status,
+    404,
+  );
+  assert.equal((await put(0, bytes.subarray(0, upload.chunkSize))).status, 200);
+  assert.equal((await put(0, bytes.subarray(0, upload.chunkSize))).status, 200);
+  assert.equal((await put(1, Buffer.from([1]))).status, 400);
+  assert.equal((await put(1, bytes.subarray(upload.chunkSize))).status, 200);
+  const done = await req(`/uploads/${upload.id}/finish`, {}, client);
+  assert.equal(done.status, 200);
+  assert.equal(done.body.storage, "postgres");
+  assert.equal(
+    (await req(`/uploads/${upload.id}/finish`, {}, client)).body.id,
+    done.body.id,
+  );
+  assert.equal(
+    (
+      await fetch(base + `/api/files/${upload.id}`, {
+        headers: { cookie: other.cookie },
+      })
+    ).status,
+    403,
+  );
+  const download = await fetch(base + `/api/files/${upload.id}`, {
+    headers: { cookie: client.cookie },
+  });
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), bytes);
+});
 test("logout invalidates session", async () => {
   assert.equal((await req("/logout", {}, client)).status, 200);
   assert.equal((await req("/state", undefined, client)).status, 401);

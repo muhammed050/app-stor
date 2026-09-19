@@ -54,7 +54,7 @@ test("all application tables have RLS and public has no private schema access", 
       "SELECT relname, relrowsecurity FROM pg_class JOIN pg_namespace ON pg_namespace.oid=relnamespace WHERE nspname='eldevo' AND relkind='r' AND relname <> 'migrations'",
     )
     .all();
-  assert.equal(tables.length, 7);
+  assert.equal(tables.length, 9);
   assert.ok(tables.every((table) => table.relrowsecurity));
   await db.exec("CREATE ROLE eldevo_test_anon NOLOGIN");
   await assert.rejects(

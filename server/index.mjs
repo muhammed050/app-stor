@@ -1,3 +1,10 @@
+import {
+  beginUpload,
+  uploadPart,
+  finishUpload,
+  streamUpload,
+} from "./uploads.mjs";
+import { runSweep, authorizeJob } from "./jobs.mjs";
 import { createServer } from "node:http";
 import {
   mkdirSync,
@@ -97,6 +104,7 @@ function sameOrigin(req) {
     d.fail("مصدر الطلب غير مسموح", 403);
 }
 async function upload(req, u) {
+  if (process.env.VERCEL) d.fail("استخدم رفع الملفات المجزأ", 400);
   await limit(`upload:${u.id}`, 20, 3600000);
   const name = decodeURIComponent(req.headers["x-file-name"] || "");
   const ext = extname(name).toLowerCase();
@@ -181,9 +189,14 @@ async function download(res, u, key) {
     "Cache-Control": "private, no-store",
     "X-Content-Type-Options": "nosniff",
   });
+  if (f.storage === "postgres") return streamUpload(res, f);
+  if (!existsSync(resolve(uploads, key))) {
+    res.destroy();
+    return;
+  }
   createReadStream(resolve(uploads, key)).pipe(res);
 }
-export const server = createServer(async (req, res) => {
+export async function handler(req, res) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-Frame-Options", "DENY");
@@ -210,6 +223,10 @@ export const server = createServer(async (req, res) => {
         200,
         await applyEvent(verifySignature(raw, req.headers)),
       );
+    }
+    if (path === "/api/jobs/verify" && method === "POST") {
+      await authorizeJob(req);
+      return json(res, 200, await runSweep());
     }
     if (mutation) sameOrigin(req);
     if (path === "/api/health") {
@@ -346,7 +363,19 @@ export const server = createServer(async (req, res) => {
         return json(res, 201, await upload(req, u));
       if (!mutation) d.fail("المسار غير موجود", 404);
       await limit(`write:${u.id}`, 120, 60000);
+      const uploadMatch = path.match(/^\/api\/uploads\/([^/]+)\/parts\/(\d+)$/);
+      if (uploadMatch)
+        return json(
+          res,
+          200,
+          await uploadPart(req, u, uploadMatch[1], uploadMatch[2]),
+        );
       const b = JSON.parse((await body(req)) || "{}");
+      if (path === "/api/uploads")
+        return json(res, 201, await beginUpload(u, b));
+      const finishMatch = path.match(/^\/api\/uploads\/([^/]+)\/finish$/);
+      if (finishMatch)
+        return json(res, 200, await finishUpload(u, finishMatch[1]));
       const parts = path.split("/").filter(Boolean);
       let result;
       if (path === "/api/logout") {
@@ -475,54 +504,18 @@ export const server = createServer(async (req, res) => {
             : e.message,
     });
   }
-});
-if (process.env.NODE_ENV !== "test") {
+}
+export const server = createServer(handler);
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   server.listen(
     Number(process.env.PORT || 3000),
     process.env.HOST || "127.0.0.1",
     () => console.log(`Eldevo running on port ${process.env.PORT || 3000}`),
   );
-  let sweeping = false;
-  const timer = setInterval(async () => {
-    if (sweeping) return;
-    sweeping = true;
-    try {
-      for (const a of (await records("app"))
-        .filter((a) => {
-          const lastCheck = Date.parse(a.verification?.checkedAt || "") || 0;
-          if (a.status === "submitted")
-            return Date.now() - lastCheck > 15 * 60000;
-          if (a.status === "verified")
-            return (
-              Date.parse(a.releaseAt) <= Date.now() &&
-              Date.now() - lastCheck > 60000
-            );
-          if (a.status === "completed")
-            return Date.now() - lastCheck > 86400000;
-          return false;
-        })
-        .slice(0, 5))
-        try {
-          await d.verifyApp(
-            {
-              id: "system",
-              role: "admin",
-            },
-            a.id,
-          );
-          if (a.status === "verified") await d.settle(a.id);
-        } catch (e) {
-          await audit("system", "settlement.blocked", a.id, e.message);
-        }
-      await db.prepare("DELETE FROM sessions WHERE expires<?").run(Date.now());
-      await db.prepare("DELETE FROM resets WHERE expires<?").run(Date.now());
-    } catch {
-      console.error(
-        "Background database check failed; will retry on the next interval",
-      );
-    } finally {
-      sweeping = false;
-    }
-  }, 60000);
+  const timer = setInterval(
+    () =>
+      runSweep().catch(() => console.error("Scheduled verification failed")),
+    60000,
+  );
   timer.unref();
 }

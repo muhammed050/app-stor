@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { db, atomic } from "./connection.mjs";
 export { db, atomic };
-export const dataDir = resolve(process.env.DATA_DIR || "./data");
+export const dataDir = resolve(
+  process.env.VERCEL ? "/tmp/eldevo" : process.env.DATA_DIR || "./data",
+);
 mkdirSync(dataDir, {
   recursive: true,
   mode: 0o700,
