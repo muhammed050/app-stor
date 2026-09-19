@@ -66,7 +66,7 @@ import "./design.css";
 import "./design-v2.css";
 import "./i18n.css";
 import { Brand, PublicPage, PublicFooter } from "./public-pages.jsx";
-import { applyLanguage, LanguageSwitcher, translateDocument, translateValue, useLanguage } from "./i18n.js";
+import { applyLanguage, getLanguage, LanguageSwitcher, translateDocument, translateValue, useLanguage } from "./i18n.js";
 import { publicPages, origin as siteOrigin, pageSchema } from "../shared/seo.mjs";
 import { cryptoMethods, enabledMethods, methodById, transactionUrl } from "../shared/crypto.mjs";
 import { requestJson } from "./http.mjs";
@@ -94,8 +94,9 @@ const money = (n) =>
   );
 const date = (n) =>
   n
-    ? new Intl.DateTimeFormat("ar", { dateStyle: "medium" }).format(new Date(n))
+    ? new Intl.DateTimeFormat(getLanguage() === "en" ? "en-US" : getLanguage() === "ru" ? "ru-RU" : "ar", { dateStyle: "medium" }).format(new Date(n))
     : "—";
+const dateTime = (n) => n ? new Intl.DateTimeFormat(getLanguage() === "en" ? "en-US" : getLanguage() === "ru" ? "ru-RU" : "ar", { dateStyle: "medium", timeStyle: "short" }).format(new Date(n)) : "—";
 const form = (e) => Object.fromEntries(new FormData(e.currentTarget));
 const statusNames = {
   reviewing: "قيد الفحص",
@@ -1661,7 +1662,7 @@ function AppDetail({ id }) {
               {a.releaseAt && (
                 <p className="muted">
                   انتهاء مهلة الاعتراض:{" "}
-                  {new Date(a.releaseAt).toLocaleString("ar")}
+                  {dateTime(a.releaseAt)}
                 </p>
               )}
               <p className="muted">
@@ -2685,7 +2686,7 @@ function Admin() {
                       <code>{a.target.slice(0, 12)}</code>
                     </td>
                     <td>{a.detail || "—"}</td>
-                    <td>{new Date(a.created_at).toLocaleString("ar")}</td>
+                    <td>{dateTime(a.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
