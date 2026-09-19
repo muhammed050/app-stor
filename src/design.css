@@ -13,3 +13,6 @@ body{line-height:1.8}h1,h2,h3{letter-spacing:0}h1{font-weight:700}h2{font-weight
 /* Keep footer margins inside the viewport; inherited footer widths must not add to them. */
 .site-footer .footer-base{width:auto}.public-site *{min-width:0}.public-site .brand{flex-shrink:0}.site-footer .footer-grid{width:100%}.auth-story .brand small{color:#abc0d1}.brand b{font-size:25px}.sidebar .brand b{font-size:21px}.sidebar .brand-symbol{width:42px;height:42px}.brand small{font-size:10px}
 @media(max-width:580px){.site-nav .brand b{font-size:19px}.site-nav .brand-symbol{width:34px;height:34px}.site-nav .brand{gap:7px}.site-nav-inner{column-gap:8px}.site-nav .nav-login{font-size:11px;padding:9px 10px}.auth-story{display:block}}
+
+/* Readable text on the dashboard navy surface. */
+.dashboard-hero{color:#fff}.dashboard-hero h2{color:#fff}.hero-metric{color:#a5eccf}.hero-metric>span:last-child{color:#b8cddd}
