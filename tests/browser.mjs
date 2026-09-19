@@ -173,6 +173,10 @@ try {
   }
   await page.getByText('2 / 8', {exact:false}).waitFor();
   await page.screenshot({path:'playwright-report/submission.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Submission must fit mobile');
+  await page.screenshot({path:'playwright-report/submission-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
   await page.locator("input[name=budget]").fill("75");
   await page.locator("input[name=rights]").check();
   await page

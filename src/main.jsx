@@ -1107,6 +1107,7 @@ function NewApp() {
           <ActionForm
             submit="إرسال التطبيق للفحص"
             onSubmit={async (b) => {
+              if(data.balance.available < s.reviewFee) throw new Error("أضف رصيد رسم الفحص إلى محفظتك قبل إرسال الطلب");
               if(assets.icon.length!==1||assets.feature.length!==1||assets.screenshots.length<2) throw new Error("أضف الأيقونة والصورة المميزة ولقطتي شاشة على الأقل");
               if(!b.binary?.name?.toLowerCase().endsWith('.aab')) throw new Error("طلبات النشر الجديدة تحتاج ملف AAB");
               const send = async (file,kind) => { if(uploadCache.current.has(file))return uploadCache.current.get(file); setUploadStatus(`جارٍ رفع ${file.name}…`); const result=await uploadFile(file,kind);uploadCache.current.set(file,result);return result; };

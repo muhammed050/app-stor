@@ -4,7 +4,8 @@ export async function validateListing(b,user) {
  const bad=m=>{const e=new Error(m);e.status=400;throw e;};
  if(!b||typeof b!=='object'||!Array.isArray(b.assets))bad('أكمل صور المتجر وبيانات المراجعة');
  const out={};
- const txt=(key,min,max)=>{const value=typeof b[key]==='string'?b[key].trim():'';if(value.length<min||value.length>max)bad(`الحقل ${key} غير مكتمل أو أطول من الحد`);out[key]=value;return value;};
+ const labels={shortDescription:"الوصف المختصر",language:"اللغة",supportEmail:"بريد الدعم",targetAudience:"الفئات العمرية",permissions:"الأذونات والمكتبات",contentDeclarations:"إقرارات المحتوى",countries:"دول التوزيع",deviceNotes:"الأجهزة",accessInstructions:"تعليمات المراجع",dataSafety:"أمان البيانات",deletionUrl:"رابط حذف الحساب",videoUrl:"رابط الفيديو"};
+ const txt=(key,min,max)=>{const value=typeof b[key]==='string'?b[key].trim():'';if(value.length<min||value.length>max)bad(`الحقل ${labels[key]||key} غير مكتمل أو أطول من الحد`);out[key]=value;return value;};
  txt('shortDescription',1,80);txt('language',2,20);txt('supportEmail',3,200);
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out.supportEmail))bad('بريد الدعم غير صالح');
  for(const [key,values] of Object.entries({appType:['app','game'],distribution:['free','paid'],containsAds:['yes','no'],inAppPurchases:['yes','no'],requiresLogin:['yes','no'],createsAccounts:['yes','no'],collectsData:['yes','no']})){if(!values.includes(b[key]))bad('أجب عن أسئلة التطبيق والخصوصية');out[key]=b[key];}
