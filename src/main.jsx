@@ -1,5 +1,7 @@
+import {ListingAssets, ReviewFields, ListingDetails} from "./submission.jsx";
 import React, {
   useState,
+  useRef,
   useEffect,
   useContext,
   createContext,
@@ -1083,6 +1085,9 @@ async function uploadFile(file, kind = "app") {
 
 function NewApp() {
   const { data, user, go } = useApp();
+  const [assets, setAssets] = useState({icon:[],feature:[],screenshots:[]});
+  const [uploadStatus, setUploadStatus] = useState("");
+  const uploadCache = useRef(new WeakMap());
   const [budget, setBudget] = useState(data.settings.minPublishBudget / 100);
   if (user.role !== "client")
     return <Empty title="إضافة التطبيقات متاحة لحسابات أصحاب التطبيقات" />;
@@ -1102,23 +1107,31 @@ function NewApp() {
           <ActionForm
             submit="إرسال التطبيق للفحص"
             onSubmit={async (b) => {
-              const file = await uploadFile(b.binary);
+              if(assets.icon.length!==1||assets.feature.length!==1||assets.screenshots.length<2) throw new Error("أضف الأيقونة والصورة المميزة ولقطتي شاشة على الأقل");
+              if(!b.binary?.name?.toLowerCase().endsWith('.aab')) throw new Error("طلبات النشر الجديدة تحتاج ملف AAB");
+              const send = async (file,kind) => { if(uploadCache.current.has(file))return uploadCache.current.get(file); setUploadStatus(`جارٍ رفع ${file.name}…`); const result=await uploadFile(file,kind);uploadCache.current.set(file,result);return result; };
+              const listingAssets=[];
+              for(const [type,items] of Object.entries(assets)) for(const item of items){ const f=await send(item.file,'listing');listingAssets.push({id:f.id,type}); }
+              const file = await send(b.binary,'app');
+              setUploadStatus('اكتمل رفع الملفات؛ جارٍ إرسال الطلب…');
               const a = await api("/apps", {
                 ...b,
                 fileId: file.id,
+                listing: {...b, binary:undefined, icon:undefined, feature:undefined, screenshots:undefined, assets:listingAssets, declarationsConfirmed:b.declarationsConfirmed === "on"},
                 budget: Math.round(Number(b.budget) * 100),
                 rights: b.rights === "on",
               });
               go(`/apps/${a.id}`);
             }}
           >
+            <h3>1. بيانات التطبيق وملف الإصدار</h3>
             <div className="form-grid">
               <Field
                 label="اسم التطبيق"
                 name="title"
                 required
                 minLength={2}
-                maxLength={80}
+                maxLength={30}
                 placeholder="اسم تطبيقك"
               />
               <Field label="التصنيف">
@@ -1159,30 +1172,28 @@ function NewApp() {
               <textarea
                 name="description"
                 minLength={20}
-                maxLength={5000}
+                maxLength={4000}
                 required
                 rows={5}
                 placeholder="ما وظيفة التطبيق؟ ما البيانات والأذونات التي يستخدمها؟"
               />
             </Field>
+            <Field label="الوصف المختصر" name="shortDescription" required maxLength={80} hint="حتى 80 حرفًا؛ وصف التطبيق الكامل أعلاه حتى 4000 حرف."/>
+            <div className="form-grid"><Field label="لغة المتجر الأساسية"><select name="language" required><option value="ar">العربية</option><option value="en-US">English</option><option value="tr-TR">Türkçe</option></select></Field><Field label="نوع التطبيق"><select name="appType"><option value="app">تطبيق</option><option value="game">لعبة</option></select></Field><Field label="سعر التطبيق في المتجر"><select name="distribution"><option value="free">مجاني</option><option value="paid">مدفوع — يحتاج اتفاقًا مع الناشر</option></select></Field></div>
             <Field
-              label="رابط سياسة الخصوصية"
-              name="privacyUrl"
-              type="url"
-              required
-              dir="ltr"
-              placeholder="https://example.com/privacy"
-            />
-            <Field
-              label="ملف التطبيق AAB أو APK"
-              hint="حتى 128 MB. الملف خاص بفريق المراجعة والناشر المختار."
+              label="ملف التطبيق AAB"
+              hint="AAB موقّع للنشر، حتى 128 MB (حد منصتنا). لا ترفع مفتاح التوقيع أو كلمة مروره."
             >
               <div className="upload-box">
                 <UploadCloud size={29} />
                 <strong>أرفق نسخة التطبيق الجاهزة</strong>
-                <input name="binary" type="file" accept=".aab,.apk" required />
+                <input name="binary" type="file" accept=".aab" required />
               </div>
             </Field>
+            <ListingAssets onChange={setAssets}/>
+            <ReviewFields Field={Field}/>
+            <h3>4. الميزانية والتأكيد</h3>
+            {uploadStatus&&<p role="status" className="notice">{uploadStatus}</p>}
             <Field
               label="ميزانيتك للنشر بالدولار"
               hint={`الحد الأدنى ${money(s.minPublishBudget)}؛ عمولة المنصة ${s.commissionBps / 100}% مشمولة ضمن الميزانية.`}
@@ -1511,6 +1522,7 @@ function AppDetail({ id }) {
             >
               سياسة الخصوصية <ExternalLink size={15} />
             </a>
+            <ListingDetails listing={a.listing}/>
             {a.report && (
               <Notice>
                 <strong>تقرير الفحص</strong>

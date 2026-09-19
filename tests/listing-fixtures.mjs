@@ -1,0 +1,7 @@
+import {deflateSync} from 'node:zlib';
+export function png(width,height,alpha=false){
+ const chunk=(type,data)=>{const t=Buffer.from(type),all=Buffer.concat([t,data]);let crc=0xffffffff;for(const byte of all){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}const out=Buffer.alloc(data.length+12);out.writeUInt32BE(data.length);all.copy(out,4);out.writeUInt32BE((crc^0xffffffff)>>>0,out.length-4);return out;};
+ const head=Buffer.alloc(13);head.writeUInt32BE(width);head.writeUInt32BE(height,4);head[8]=8;head[9]=alpha?6:2;
+ return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',head),chunk('IDAT',deflateSync(Buffer.alloc((width*(alpha?4:3)+1)*height))),chunk('IEND',Buffer.alloc(0))]);
+}
+export async function listingFixture(save,owner){const assets=[];for(const [type,w,h] of [['icon',512,512],['feature',1024,500],['screenshots',1080,1920],['screenshots',1080,1920]]){const f=await save('file',{owner,kind:'listing',storage:'postgres',name:type+'.png',size:2000,image:{format:'png',width:w,height:h,depth:8,color:type==='icon'?6:2,transparent:type==='icon'}});assets.push({id:f.id,type});}return {assets,shortDescription:'Daily tasks',language:'ar',supportEmail:'support@example.test',appType:'app',distribution:'free',containsAds:'no',inAppPurchases:'no',requiresLogin:'no',createsAccounts:'no',collectsData:'no',targetAudience:'18+',permissions:'لا يوجد',contentDeclarations:'لا يوجد',countries:'كل الدول',declarationsConfirmed:true};}

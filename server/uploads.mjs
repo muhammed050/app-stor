@@ -1,3 +1,4 @@
+import {imageMetadata} from "../shared/listing.mjs";
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
 import { once } from "node:events";
@@ -6,13 +7,13 @@ import { fail, text } from "./domain.mjs";
 import { limit } from "./auth.mjs";
 export const chunkSize = 2 * 1024 * 1024;
 export async function beginUpload(user, body) {
-  await limit(`upload:${user.id}`, 20, 3600000);
+  await limit(`upload:${user.id}`, 80, 3600000);
   const name = text(body.name, 1, 150);
   const ext = extname(name).toLowerCase();
   if (
-    !["app", "receipt"].includes(body.kind) ||
+    !["app", "receipt", "listing"].includes(body.kind) ||
     !(
-      body.kind === "app" ? [".apk", ".aab"] : [".pdf", ".png", ".jpg", ".jpeg"]
+      body.kind === "app" ? [".apk", ".aab"] : body.kind === "listing" ? [".png", ".jpg", ".jpeg"] : [".pdf", ".png", ".jpg", ".jpeg"]
     ).includes(ext)
   )
     fail("نوع ملف غير مسموح");
@@ -101,6 +102,7 @@ export async function finishUpload(user, key) {
   return atomic(async () => {
     const upload = await ownUpload(user, key);
     if (upload.completed) return record(key);
+    const imageParts = [];
     const hash = createHash("sha256");
     let size = 0;
     for (let part = 0; part < Math.ceil(upload.size / chunkSize); part++) {
@@ -113,10 +115,13 @@ export async function finishUpload(user, key) {
       const content = Buffer.from(row.content);
       if (part === 0 && !validHeader(content, upload))
         fail("محتوى الملف لا يطابق نوعه");
+      if(upload.kind === "listing") imageParts.push(content);
       hash.update(content);
       size += content.length;
     }
     if (size !== upload.size) fail("حجم الملف غير مطابق");
+    let image;
+    if(upload.kind === "listing") {try {image=imageMetadata(Buffer.concat(imageParts));} catch(e){fail(e.message);} }
     const file = await save("file", {
       id: key,
       owner: user.id,
@@ -125,6 +130,7 @@ export async function finishUpload(user, key) {
       size,
       sha256: hash.digest("hex"),
       storage: "postgres",
+      ...(image ? {image} : {}),
     });
     await db.prepare("UPDATE uploads SET completed=true WHERE id=?").run(key);
     return file;

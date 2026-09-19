@@ -179,7 +179,7 @@ async function download(res, u, key) {
     u.role === "admin" ||
     f.owner === u.id ||
     (await records("app")).some(
-      (a) => a.fileId === key && a.publisherId === u.id,
+      (a) => (a.fileId === key || a.listing?.assets?.some(f=>f.id===key)) && a.publisherId === u.id,
     ) ||
     (await records("update")).some(
       (a) => a.fileId === key && a.publisherId === u.id,

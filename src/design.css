@@ -16,3 +16,5 @@ body{line-height:1.8}h1,h2,h3{letter-spacing:0}h1{font-weight:700}h2{font-weight
 
 /* Readable text on the dashboard navy surface. */
 .dashboard-hero{color:#fff}.dashboard-hero h2{color:#fff}.hero-metric{color:#a5eccf}.hero-metric>span:last-child{color:#b8cddd}
+
+.submission-section{border-top:1px solid #dde6ee;padding-top:24px;display:grid;gap:18px}.submission-section>p,.listing-upload small{color:#567083;font-size:13px;line-height:1.9}.listing-upload{padding:20px;border:1px dashed #a7bdc9;border-radius:12px;background:#f7fafb}.listing-upload label{display:grid;gap:10px}.listing-upload input{max-width:100%}.asset-previews{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}.asset-previews figure{margin:0;width:115px}.asset-previews img{width:115px;height:110px;object-fit:contain;background:#e8eef2;border-radius:8px}.asset-previews figcaption{font-size:11px;overflow-wrap:anywhere}.listing-details{display:grid;gap:16px}.listing-details dt{font-size:13px;color:#60778a}.listing-details dd{margin:5px 0;overflow-wrap:anywhere}.listing-downloads{display:flex;gap:10px;flex-wrap:wrap}

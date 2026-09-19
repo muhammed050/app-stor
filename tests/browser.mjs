@@ -1,3 +1,4 @@
+import {png} from "./listing-fixtures.mjs";
 import { chromium } from "@playwright/test";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -158,6 +159,20 @@ try {
     mimeType: "application/octet-stream",
     buffer: Buffer.from([80, 75, 3, 4, 0, 0, 0, 0]),
   });
+  await page.getByLabel("الوصف المختصر",{exact:true}).fill("تنظيم المهام اليومية بسهولة");
+  await page.getByLabel("بريد الدعم الظاهر في المتجر").fill("support@example.test");
+  for(const name of ['containsAds','inAppPurchases','requiresLogin','createsAccounts','collectsData']) await page.locator(`select[name=${name}]`).selectOption('no');
+  await page.locator('input[name=targetAudience]').fill('18 سنة فأكثر');
+  await page.locator('textarea[name=permissions]').fill('لا يوجد');
+  await page.locator('textarea[name=contentDeclarations]').fill('لا يوجد');
+  await page.locator('input[name=countries]').fill('كل الدول');
+  await page.locator('input[name=declarationsConfirmed]').check();
+  for(const [name,width,height] of [['icon',512,512],['feature',1024,500],['screenshots',1080,1920]]) {
+    const file={name:name+'.png',mimeType:'image/png',buffer:png(width,height,name==='icon')};
+    await page.locator(`input[name=${name}]`).setInputFiles(name==='screenshots'?[file,{...file,name:'second.png'}]:file);
+  }
+  await page.getByText('2 / 8', {exact:false}).waitFor();
+  await page.screenshot({path:'playwright-report/submission.png',fullPage:true});
   await page.locator("input[name=budget]").fill("75");
   await page.locator("input[name=rights]").check();
   await page

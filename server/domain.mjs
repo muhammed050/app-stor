@@ -1,3 +1,4 @@
+import {validateListing} from "./listing.mjs";
 import { cryptoMethods, enabledMethods, methodById, validAddress, validTransaction } from "../shared/crypto.mjs";
 import { randomBytes } from "node:crypto";
 import {
@@ -201,13 +202,16 @@ export async function createApp(u, b) {
     const privacy = new URL(b.privacyUrl);
     if (privacy.protocol !== "https:") fail("رابط الخصوصية يجب أن يكون HTTPS");
     if (b.rights !== true) fail("يجب تأكيد حقوق التطبيق");
+    if(!f.name?.toLowerCase().endsWith(".aab")) fail("النشر الجديد يحتاج ملف AAB");
+    const listing = await validateListing(b.listing,u);
     return await atomic(async () => {
       const a = await save("app", {
         owner: u.id,
-        title: text(b.title, 2, 80),
+        title: text(b.title, 2, 30),
         packageName: pkg,
         version: text(b.version, 1, 30),
-        description: text(b.description, 20, 5000),
+        description: text(b.description, 20, 4000),
+        listing,
         category: text(b.category, 2, 60),
         privacyUrl: privacy.href,
         fileId: f.id,

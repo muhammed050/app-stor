@@ -1,3 +1,4 @@
+import {png} from "./listing-fixtures.mjs";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -216,4 +217,20 @@ after(async () => {
     recursive: true,
     force: true,
   });
+});
+
+test("listing image bytes and access are restricted to owner, admin and chosen publisher", async()=>{
+ const client=await register("asset-owner@example.test");
+ const bytes=png(512,512,true);
+ const start=await req('/uploads',{name:'icon.png',kind:'listing',size:bytes.length},client);
+ assert.equal(start.status,201);
+ const uploaded=await fetch(base+`/api/uploads/${start.body.id}/parts/0`,{method:'POST',headers:{cookie:client.cookie,'X-CSRF-Token':client.csrf},body:bytes});
+ assert.equal(uploaded.status,200);
+ const done=await req(`/uploads/${start.body.id}/finish`,{},client);assert.equal(done.status,200);assert.equal(done.body.image.width,512);
+ const pub=await register('asset-publisher@example.test','publisher');
+ await save('app',{owner:client.user.id,publisherId:pub.user.id,listing:{assets:[{id:done.body.id,type:'icon'}]}});
+ for(const [session,status] of [[other,403],[client,200],[pub,200]]) {
+  const r=await fetch(base+'/api/files/'+done.body.id,{headers:{cookie:session.cookie}});assert.equal(r.status,status);
+  if(status===200)assert.deepEqual(Buffer.from(await r.arrayBuffer()),bytes);
+ }
 });

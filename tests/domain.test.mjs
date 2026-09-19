@@ -1,3 +1,4 @@
+import {listingFixture} from "./listing-fixtures.mjs";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -53,6 +54,7 @@ await save("publisher", {
   status: "approved",
   developerIdentity: "/store/apps/dev?id=1234",
 });
+const listing = await listingFixture(save,client.id);
 let app;
 test("user budget minimum and commission snapshot enforced on server", async () => {
   const body = {
@@ -63,6 +65,7 @@ test("user budget minimum and commission snapshot enforced on server", async () 
     category: "Tools",
     privacyUrl: "https://example.com/privacy",
     fileId: file.id,
+    listing,
     rights: true,
     budget: 4999,
   };
@@ -363,6 +366,7 @@ test("settlement requires recent verification and pays exact platform split once
     category: "Tools",
     privacyUrl: "https://example.com/privacy",
     fileId: file.id,
+    listing,
     rights: true,
     budget: 5000,
   });
