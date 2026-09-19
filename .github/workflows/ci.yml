@@ -5,6 +5,19 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: integration-only-password
+          POSTGRES_DB: eldevo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -14,6 +27,15 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Verify PostgreSQL connection, migration and concurrent transactions
+        env:
+          SUPABASE_DB_URL: postgresql://postgres:integration-only-password@127.0.0.1:5432/eldevo_test
+          DATABASE_SSL: disable
+          DATABASE_TEST_POSTGRES: '1'
+        run: |
+          npm run db:migrate
+          npm run db:migrate
+          node --test tests/database.test.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser

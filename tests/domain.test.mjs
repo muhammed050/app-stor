@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { createHmac } from "node:crypto";
 process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "eldevo-tests-"));
 process.env.NODE_ENV = "test";
+process.env.DATABASE_DRIVER = "pglite";
 process.env.WHOP_COMPANY_ID = "biz_test";
 const { db, record, save, post, atomic, balance, settings } =
   await import("../server/db.mjs");
@@ -13,33 +14,39 @@ const { createUser } = await import("../server/auth.mjs");
 const d = await import("../server/domain.mjs");
 const { playUrl, parseListing } = await import("../server/play.mjs");
 const { applyEvent, verifySignature } = await import("../server/whop.mjs");
-const client = createUser({
+const client = await createUser({
   name: "Client",
   email: "client@test.com",
   password: "test-password-1234",
   role: "client",
 });
-const pub = createUser({
+const pub = await createUser({
   name: "Publisher",
   email: "pub@test.com",
   password: "test-password-1234",
   role: "publisher",
 });
-const outsider = createUser({
+const outsider = await createUser({
   name: "Other",
   email: "other@test.com",
   password: "test-password-1234",
   role: "client",
 });
-const admin = createUser({
+const admin = await createUser({
   name: "Admin",
   email: "admin@test.com",
   password: "test-password-1234",
   role: "admin",
 });
-const file = save("file", { owner: client.id, kind: "app", name: "app.aab" });
-atomic(() => post(client.id, 50000, 0, "test fixture", "seed", "seed"));
-save("publisher", {
+const file = await save("file", {
+  owner: client.id,
+  kind: "app",
+  name: "app.aab",
+});
+await atomic(
+  async () => await post(client.id, 50000, 0, "test fixture", "seed", "seed"),
+);
+await save("publisher", {
   id: `publisher:${pub.id}`,
   owner: pub.id,
   name: pub.name,
@@ -47,7 +54,7 @@ save("publisher", {
   developerIdentity: "/store/apps/dev?id=1234",
 });
 let app;
-test("user budget minimum and commission snapshot enforced on server", () => {
+test("user budget minimum and commission snapshot enforced on server", async () => {
   const body = {
     title: "My app",
     packageName: "com.example.app",
@@ -59,45 +66,64 @@ test("user budget minimum and commission snapshot enforced on server", () => {
     rights: true,
     budget: 4999,
   };
-  assert.throws(() => d.createApp(client, body));
-  app = d.createApp(client, { ...body, budget: 8000 });
+  await assert.rejects(async () => await d.createApp(client, body));
+  app = await d.createApp(client, {
+    ...body,
+    budget: 8000,
+  });
   assert.equal(app.price.publishFee, 8000);
   assert.equal(app.price.publisherShare, 6400);
-  assert.deepEqual(balance(client.id), { available: 49000, held: 1000 });
+  assert.deepEqual(await balance(client.id), {
+    available: 49000,
+    held: 1000,
+  });
 });
-test("access isolation rejects another client and unauthorized admin call", () => {
-  assert.throws(
-    () => d.owned(app.id, outsider, "app"),
+test("access isolation rejects another client and unauthorized admin call", async () => {
+  await assert.rejects(
+    async () => await d.owned(app.id, outsider, "app"),
     (e) => e.status === 403,
   );
-  assert.throws(
-    () => d.adminAction(client, "apps", app.id, { action: "review" }),
+  await assert.rejects(
+    async () =>
+      await d.adminAction(client, "apps", app.id, {
+        action: "review",
+      }),
     (e) => e.status === 403,
   );
 });
-test("review cannot be charged twice and only approved apps become available", () => {
-  d.adminAction(admin, "apps", app.id, {
+test("review cannot be charged twice and only approved apps become available", async () => {
+  await d.adminAction(admin, "apps", app.id, {
     action: "review",
     decision: "approve",
     report: "Reviewed permissions and content and rights manually.",
   });
-  assert.equal(record(app.id).status, "open");
-  assert.equal(balance(client.id).held, 0);
-  assert.throws(() =>
-    d.adminAction(admin, "apps", app.id, {
-      action: "review",
-      decision: "approve",
-      report: "Reviewed permissions and content and rights manually.",
-    }),
+  assert.equal((await record(app.id)).status, "open");
+  assert.equal((await balance(client.id)).held, 0);
+  await assert.rejects(
+    async () =>
+      await d.adminAction(admin, "apps", app.id, {
+        action: "review",
+        decision: "approve",
+        report: "Reviewed permissions and content and rights manually.",
+      }),
   );
-  assert.equal(balance("platform").available, 1000);
+  assert.equal((await balance("platform")).available, 1000);
 });
-test("publisher offer and customer choice reserve funds once", () => {
-  d.offer(pub, app.id, { note: "Ready to publish this application." });
-  d.choose(client, app.id, { publisherId: pub.id });
-  assert.equal(balance(client.id).held, 8000);
-  assert.throws(() => d.choose(client, app.id, { publisherId: pub.id }));
-  assert.equal(balance(client.id).held, 8000);
+test("publisher offer and customer choice reserve funds once", async () => {
+  await d.offer(pub, app.id, {
+    note: "Ready to publish this application.",
+  });
+  await d.choose(client, app.id, {
+    publisherId: pub.id,
+  });
+  assert.equal((await balance(client.id)).held, 8000);
+  await assert.rejects(
+    async () =>
+      await d.choose(client, app.id, {
+        publisherId: pub.id,
+      }),
+  );
+  assert.equal((await balance(client.id)).held, 8000);
 });
 test("public verifier rejects SSRF, mismatch, ambiguous page and captcha", () => {
   assert.throws(() => playUrl("http://127.0.0.1/private"));
@@ -143,44 +169,56 @@ test("public verifier rejects SSRF, mismatch, ambiguous page and captcha", () =>
     "unknown",
   );
 });
-test("unknown verification never releases money and disputes freeze settlement", () => {
-  let a = record(app.id);
+test("unknown verification never releases money and disputes freeze settlement", async () => {
+  let a = await record(app.id);
   a.status = "verified";
   a.releaseAt = new Date(Date.now() - 1000).toISOString();
-  a.verification = { status: "unknown", checkedAt: new Date().toISOString() };
-  save("app", a);
-  assert.throws(() => d.settle(a.id));
+  a.verification = {
+    status: "unknown",
+    checkedAt: new Date().toISOString(),
+  };
+  await save("app", a);
+  await assert.rejects(async () => await d.settle(a.id));
   a.verification.status = "verified";
-  save("app", a);
-  d.dispute(client, a.id, {
+  await save("app", a);
+  await d.dispute(client, a.id, {
     reason: "The published application is not the expected build.",
   });
-  assert.throws(() => d.settle(a.id));
-  assert.equal(balance(pub.id).available, 0);
+  await assert.rejects(async () => await d.settle(a.id));
+  assert.equal((await balance(pub.id)).available, 0);
 });
-test("administrator refund restores held budget exactly once", () => {
-  d.adminAction(admin, "apps", app.id, {
+test("administrator refund restores held budget exactly once", async () => {
+  await d.adminAction(admin, "apps", app.id, {
     action: "cancel",
     note: "Confirmed publication issue and approved the refund.",
   });
-  assert.equal(balance(client.id).held, 0);
-  assert.equal(balance(client.id).available, 49000);
-  assert.throws(() =>
-    d.adminAction(admin, "apps", app.id, {
-      action: "cancel",
-      note: "Retry cancellation should not double refund.",
-    }),
+  assert.equal((await balance(client.id)).held, 0);
+  assert.equal((await balance(client.id)).available, 49000);
+  await assert.rejects(
+    async () =>
+      await d.adminAction(admin, "apps", app.id, {
+        action: "cancel",
+        note: "Retry cancellation should not double refund.",
+      }),
   );
 });
-test("atomic insufficient balance leaves no orphan ledger entry", () => {
-  assert.throws(() =>
-    atomic(() => post(outsider.id, -100, 100, "hold", "x", "negative")),
+test("atomic insufficient balance leaves no orphan ledger entry", async () => {
+  await assert.rejects(
+    async () =>
+      await atomic(
+        async () => await post(outsider.id, -100, 100, "hold", "x", "negative"),
+      ),
   );
-  assert.deepEqual(balance(outsider.id), { available: 0, held: 0 });
+  assert.deepEqual(await balance(outsider.id), {
+    available: 0,
+    held: 0,
+  });
 });
 test("Whop webhook signature rejects forged and stale payloads", () => {
   const secret = "ws_fixture",
-    raw = JSON.stringify({ type: "test" }),
+    raw = JSON.stringify({
+      type: "test",
+    }),
     stamp = String(Math.floor(Date.now() / 1000)),
     eventId = "msg_1";
   const signature = createHmac("sha256", secret)
@@ -194,11 +232,18 @@ test("Whop webhook signature rejects forged and stale payloads", () => {
   assert.equal(verifySignature(raw, headers, secret).type, "test");
   assert.throws(() => verifySignature(raw + " ", headers, secret));
   assert.throws(() =>
-    verifySignature(raw, { ...headers, "webhook-timestamp": "1" }, secret),
+    verifySignature(
+      raw,
+      {
+        ...headers,
+        "webhook-timestamp": "1",
+      },
+      secret,
+    ),
   );
 });
-test("Whop payment checks price and owner and never double credits", () => {
-  const p = save("payment", {
+test("Whop payment checks price and owner and never double credits", async () => {
+  const p = await save("payment", {
     owner: client.id,
     provider: "whop",
     amount: 5000,
@@ -209,87 +254,108 @@ test("Whop payment checks price and owner and never double credits", () => {
     type: "payment.succeeded",
     data: {
       id: "pay_test",
-      metadata: { eldevo_payment_id: p.id, eldevo_user_id: client.id },
-      company: { id: "biz_test" },
+      metadata: {
+        eldevo_payment_id: p.id,
+        eldevo_user_id: client.id,
+      },
+      company: {
+        id: "biz_test",
+      },
       currency: "usd",
       status: "paid",
       subtotal: 50,
-      plan: { id: "plan_test" },
+      plan: {
+        id: "plan_test",
+      },
     },
   };
-  assert.throws(() =>
-    applyEvent({ ...event, data: { ...event.data, subtotal: 5 } }),
+  await assert.rejects(
+    async () =>
+      await applyEvent({
+        ...event,
+        data: {
+          ...event.data,
+          subtotal: 5,
+        },
+      }),
   );
-  assert.throws(() =>
-    d.adminAction(admin, "payments", p.id, {
-      action: "approve",
-      reference: "manual bypass",
-    }),
+  await assert.rejects(
+    async () =>
+      await d.adminAction(admin, "payments", p.id, {
+        action: "approve",
+        reference: "manual bypass",
+      }),
   );
-  const before = balance(client.id).available;
-  assert.equal(applyEvent(event).credited, true);
-  assert.equal(applyEvent(event).duplicate, true);
-  assert.equal(balance(client.id).available, before + 5000);
+  const before = (await balance(client.id)).available;
+  assert.equal((await applyEvent(event)).credited, true);
+  assert.equal((await applyEvent(event)).duplicate, true);
+  assert.equal((await balance(client.id)).available, before + 5000);
 });
-test("cryptocurrency withdrawal validates role, network, minimum, fees, transaction and prevents repeats", () => {
-  atomic(() =>
-    post(pub.id, 10000, 0, "earned fixture", "seed-pub", "seed-pub"),
+test("cryptocurrency withdrawal validates role, network, minimum, fees, transaction and prevents repeats", async () => {
+  await atomic(
+    async () =>
+      await post(pub.id, 10000, 0, "earned fixture", "seed-pub", "seed-pub"),
   );
-  assert.throws(() =>
-    d.withdraw(client, {
-      amount: 3000,
-      network: "USDC-POLYGON",
-      address: "0x" + "a".repeat(40),
-      confirmed: true,
-    }),
+  await assert.rejects(
+    async () =>
+      await d.withdraw(client, {
+        amount: 3000,
+        network: "USDC-POLYGON",
+        address: "0x" + "a".repeat(40),
+        confirmed: true,
+      }),
   );
-  assert.throws(() =>
-    d.withdraw(pub, {
-      amount: 1000,
-      network: "USDC-POLYGON",
-      address: "0x" + "a".repeat(40),
-      confirmed: true,
-    }),
+  await assert.rejects(
+    async () =>
+      await d.withdraw(pub, {
+        amount: 1000,
+        network: "USDC-POLYGON",
+        address: "0x" + "a".repeat(40),
+        confirmed: true,
+      }),
   );
-  assert.throws(() =>
-    d.withdraw(pub, {
-      amount: 3000,
-      network: "USDT-TRC20",
-      address: "0x" + "a".repeat(40),
-      confirmed: true,
-    }),
+  await assert.rejects(
+    async () =>
+      await d.withdraw(pub, {
+        amount: 3000,
+        network: "USDT-TRC20",
+        address: "0x" + "a".repeat(40),
+        confirmed: true,
+      }),
   );
-  const w = d.withdraw(pub, {
+  const w = await d.withdraw(pub, {
     amount: 3000,
     network: "USDC-POLYGON",
     address: "0x" + "a".repeat(40),
     confirmed: true,
   });
   assert.equal(w.net, 2800);
-  assert.equal(balance(pub.id).held, 3000);
-  assert.throws(() =>
-    d.adminAction(admin, "withdrawals", w.id, {
-      action: "approve",
-      reference: "fake",
-      cryptoAmount: "28",
-    }),
+  assert.equal((await balance(pub.id)).held, 3000);
+  await assert.rejects(
+    async () =>
+      await d.adminAction(admin, "withdrawals", w.id, {
+        action: "approve",
+        reference: "fake",
+        cryptoAmount: "28",
+      }),
   );
-  d.adminAction(admin, "withdrawals", w.id, {
+  await d.adminAction(admin, "withdrawals", w.id, {
     action: "approve",
     reference: "0x" + "b".repeat(64),
     cryptoAmount: "28",
   });
-  assert.equal(balance(pub.id).held, 0);
-  assert.throws(() =>
-    d.adminAction(admin, "withdrawals", w.id, {
-      action: "approve",
-      reference: "0x" + "b".repeat(64),
-      cryptoAmount: "28",
-    }),
+  assert.equal((await balance(pub.id)).held, 0);
+  await assert.rejects(
+    async () =>
+      await d.adminAction(admin, "withdrawals", w.id, {
+        action: "approve",
+        reference: "0x" + "b".repeat(64),
+        cryptoAmount: "28",
+      }),
   );
 });
-test("settlement requires recent verification and pays exact platform split once", () => {
-  const a = d.createApp(client, {
+test("settlement requires recent verification and pays exact platform split once", async () => {
+  const a = await d.createApp(client, {
     title: "Second app",
     packageName: "com.example.second",
     version: "1",
@@ -300,30 +366,37 @@ test("settlement requires recent verification and pays exact platform split once
     rights: true,
     budget: 5000,
   });
-  d.adminAction(admin, "apps", a.id, {
+  await d.adminAction(admin, "apps", a.id, {
     action: "review",
     decision: "approve",
     report: "Manually reviewed the application and its permissions.",
   });
-  d.offer(pub, a.id, { note: "I can publish this application." });
-  d.choose(client, a.id, { publisherId: pub.id });
-  let r = record(a.id);
+  await d.offer(pub, a.id, {
+    note: "I can publish this application.",
+  });
+  await d.choose(client, a.id, {
+    publisherId: pub.id,
+  });
+  let r = await record(a.id);
   r.status = "verified";
   r.releaseAt = new Date(Date.now() - 1000).toISOString();
   r.verification = {
     status: "verified",
     checkedAt: new Date(Date.now() - 7200000).toISOString(),
   };
-  save("app", r);
-  assert.throws(() => d.settle(a.id));
+  await save("app", r);
+  await assert.rejects(async () => await d.settle(a.id));
   r.verification.checkedAt = new Date().toISOString();
-  save("app", r);
-  const before = balance(pub.id).available;
-  d.settle(a.id);
-  assert.equal(balance(pub.id).available, before + 4000);
-  assert.throws(() => d.settle(a.id));
+  await save("app", r);
+  const before = (await balance(pub.id)).available;
+  await d.settle(a.id);
+  assert.equal((await balance(pub.id)).available, before + 4000);
+  await assert.rejects(async () => await d.settle(a.id));
 });
-after(() => {
-  db.close();
-  rmSync(process.env.DATA_DIR, { recursive: true, force: true });
+after(async () => {
+  await db.close();
+  rmSync(process.env.DATA_DIR, {
+    recursive: true,
+    force: true,
+  });
 });

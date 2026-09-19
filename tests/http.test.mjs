@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 process.env.DATA_DIR = mkdtempSync(join(tmpdir(), "eldevo-http-"));
 process.env.NODE_ENV = "test";
+process.env.DATABASE_DRIVER = "pglite";
 const { server } = await import("../server/index.mjs");
 const { db, save, post, atomic, record } = await import("../server/db.mjs");
 await new Promise((r) => server.listen(0, "127.0.0.1", r));
@@ -16,7 +17,10 @@ async function req(path, body, session = {}, headers = {}) {
     headers: {
       "Content-Type": "application/json",
       ...(session.cookie
-        ? { cookie: session.cookie, "X-CSRF-Token": session.csrf }
+        ? {
+            cookie: session.cookie,
+            "X-CSRF-Token": session.csrf,
+          }
         : {}),
       ...headers,
     },
@@ -36,7 +40,10 @@ async function register(email, role = "client") {
     role,
     terms: true,
   });
-  return { ...r.body, cookie: r.cookie };
+  return {
+    ...r.body,
+    cookie: r.cookie,
+  };
 }
 test("registration prevents admin role injection and persists session", async () => {
   const invalid = await req("/auth/register", {
@@ -56,26 +63,53 @@ test("registration prevents admin role injection and persists session", async ()
 test("CSRF and cross origin checks reject mutations", async () => {
   const bad = await req(
     "/tickets",
-    { subject: "hello", body: "long enough message" },
-    { ...client, csrf: "wrong" },
+    {
+      subject: "hello",
+      body: "long enough message",
+    },
+    {
+      ...client,
+      csrf: "wrong",
+    },
   );
   assert.equal(bad.status, 403);
   const cross = await req(
     "/tickets",
-    { subject: "hello", body: "long enough message" },
+    {
+      subject: "hello",
+      body: "long enough message",
+    },
     client,
-    { origin: "https://evil.example" },
+    {
+      origin: "https://evil.example",
+    },
   );
   assert.equal(cross.status, 403);
 });
 test("API cannot mint wallet money and unauthenticated users cannot read state", async () => {
   assert.equal((await req("/state")).status, 401);
   assert.equal(
-    (await req("/admin/settings", { reviewFee: 0 }, client)).status,
+    (
+      await req(
+        "/admin/settings",
+        {
+          reviewFee: 0,
+        },
+        client,
+      )
+    ).status,
     403,
   );
   assert.equal(
-    (await req("/payments", { amount: 999999 }, client)).status,
+    (
+      await req(
+        "/payments",
+        {
+          amount: 999999,
+        },
+        client,
+      )
+    ).status,
     404,
   );
 });
@@ -100,11 +134,15 @@ test("upload is private, rejects wrong file signatures and isolates owner", asyn
   assert.equal(r.status, 201);
   const file = await r.json();
   r = await fetch(base + "/api/files/" + file.id, {
-    headers: { cookie: other.cookie },
+    headers: {
+      cookie: other.cookie,
+    },
   });
   assert.equal(r.status, 403);
   r = await fetch(base + "/api/files/" + file.id, {
-    headers: { cookie: client.cookie },
+    headers: {
+      cookie: client.cookie,
+    },
   });
   assert.equal(r.status, 200);
   assert.equal(r.headers.get("content-type"), "application/octet-stream");
@@ -115,6 +153,9 @@ test("logout invalidates session", async () => {
 });
 after(async () => {
   await new Promise((r) => server.close(r));
-  db.close();
-  rmSync(process.env.DATA_DIR, { recursive: true, force: true });
+  await db.close();
+  rmSync(process.env.DATA_DIR, {
+    recursive: true,
+    force: true,
+  });
 });
