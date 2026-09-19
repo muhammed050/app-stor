@@ -1,3 +1,4 @@
+import { appOrigin } from "./config.mjs";
 import {
   beginUpload,
   uploadPart,
@@ -52,7 +53,7 @@ mkdirSync(uploads, {
   recursive: true,
   mode: 0o700,
 });
-const origin = process.env.APP_ORIGIN || "http://localhost:3000";
+const origin = appOrigin;
 const allowedOrigins = new Set([
   origin,
   ...(process.env.NODE_ENV === "production"

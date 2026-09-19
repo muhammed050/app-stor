@@ -1,3 +1,4 @@
+import { appOrigin } from "./config.mjs";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   record,
@@ -68,7 +69,7 @@ export async function createCheckout(u, b) {
             eldevo_payment_id: p.id,
             eldevo_user_id: u.id,
           },
-          redirect_url: `${process.env.APP_ORIGIN || "http://localhost:3000"}/checkout/complete`,
+          redirect_url: `${appOrigin}/checkout/complete`,
           checkout_styling: {
             background_color: "#ffffff",
             button_color: "#0e8d75",
