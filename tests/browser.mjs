@@ -140,7 +140,7 @@ try {
       exact: true,
     })
     .click();
-  await page.getByLabel("اسم التطبيق").fill("دفتر المهام");
+  await page.getByLabel("اسم التطبيق", {exact:true}).fill("دفتر المهام");
   await page.getByLabel("معرّف التطبيق Package name").fill("com.example.tasks");
   await page
     .getByLabel("رقم الإصدار", {
