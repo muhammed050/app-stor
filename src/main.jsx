@@ -64,7 +64,9 @@ import "@fontsource/ibm-plex-sans-arabic/700.css";
 import "./styles.css";
 import "./design.css";
 import "./design-v2.css";
+import "./i18n.css";
 import { Brand, PublicPage, PublicFooter } from "./public-pages.jsx";
+import { applyLanguage, LanguageSwitcher, translateDocument, useLanguage } from "./i18n.js";
 import { publicPages, origin as siteOrigin, pageSchema } from "../shared/seo.mjs";
 import { cryptoMethods, enabledMethods, methodById, transactionUrl } from "../shared/crypto.mjs";
 import { requestJson } from "./http.mjs";
@@ -307,6 +309,7 @@ function ActionForm({ children, onSubmit, submit = "حفظ", className = "" }) {
   );
 }
 function App() {
+  const [language] = useLanguage();
   const [path, setPath] = useState(location.pathname),
     [user, setUser] = useState(null),
     [data, setData] = useState(null),
@@ -345,6 +348,27 @@ function App() {
     return () => clearInterval(timer);
   }, [user?.id]);
   useEffect(() => {
+    applyLanguage(language);
+    const root = document.getElementById("root");
+    let queued = false;
+    const observer = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        translateDocument(root, language);
+      });
+    });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["aria-label", "placeholder", "title", "alt"],
+    });
+    return () => observer.disconnect();
+  }, [language]);
+  useEffect(() => {
     const meta = publicPages[path];
     document.title = meta?.title || `${path.startsWith("/admin") ? "الإدارة" : path === "/wallet" ? "المحفظة" : "مساحة العمل"} — Dorucenie`;
     const setMeta = (name, content, property = false) => {
@@ -363,7 +387,7 @@ function App() {
     canonical.href = siteOrigin + path;
     document.getElementById("site-schema")?.remove();
     if (meta) { const schema = document.createElement("script"); schema.id = "site-schema"; schema.type = "application/ld+json"; schema.textContent = JSON.stringify(pageSchema(path)); document.head.append(schema); }
-  }, [path]);
+  }, [path, language]);
   const run = async (fn) => {
     try {
       const r = await fn();
@@ -456,6 +480,7 @@ function Auth() {
         <small>Dorucenie منصة مستقلة وغير تابعة لـ Google.</small>
       </div>
       <div className="auth-form">
+        <div className="auth-language-row"><LanguageSwitcher compact /></div>
         <Link className="back-link" to="/">
           <ArrowRight size={17} /> العودة للرئيسية
         </Link>
@@ -710,6 +735,7 @@ function Shell() {
           </div>
           <div className="top-actions">
             <span className="date-text">{date(new Date())}</span>
+            <LanguageSwitcher compact />
             <Link
               to="/notifications"
               className="icon-button"
