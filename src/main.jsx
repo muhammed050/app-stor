@@ -63,6 +63,7 @@ import "@fontsource/ibm-plex-sans-arabic/600.css";
 import "@fontsource/ibm-plex-sans-arabic/700.css";
 import "./styles.css";
 import "./design.css";
+import "./design-v2.css";
 import { Brand, PublicPage, PublicFooter } from "./public-pages.jsx";
 import { publicPages, origin as siteOrigin, pageSchema } from "../shared/seo.mjs";
 import { cryptoMethods, enabledMethods, methodById, transactionUrl } from "../shared/crypto.mjs";
