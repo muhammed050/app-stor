@@ -309,7 +309,20 @@ function ActionForm({ children, onSubmit, submit = "حفظ", className = "" }) {
     </form>
   );
 }
+function getReferralCode() {
+  const current = new URLSearchParams(location.search).get("ref");
+  try {
+    const saved = JSON.parse(localStorage.getItem("dorucenie-referral-v1") || "null");
+    if (saved && saved.expires > Date.now() && /^[a-f0-9]{32}$/.test(saved.code)) return saved.code;
+    localStorage.removeItem("dorucenie-referral-v1");
+    if (/^[a-f0-9]{32}$/.test(current || "")) {
+      localStorage.setItem("dorucenie-referral-v1", JSON.stringify({code: current, expires: Date.now() + 30 * 86400000}));
+      return current;
+    }
+  } catch { return /^[a-f0-9]{32}$/.test(current || "") ? current : undefined; }
+}
 function App() {
+  useEffect(() => { getReferralCode(); }, []);
   const [language] = useLanguage();
   const [path, setPath] = useState(location.pathname),
     [user, setUser] = useState(null),
@@ -424,7 +437,7 @@ function App() {
 
           ) : user && data ? (
             <Shell />
-          ) : /^\/(dashboard|apps|market|publisher|wallet|checkout|notifications|support|settings|admin)(\/|$)/.test(path) ? (
+          ) : /^\/(dashboard|affiliate|apps|market|publisher|wallet|checkout|notifications|support|settings|admin)(\/|$)/.test(path) ? (
             <Auth />
           ) : <div className="fatal"><Logo/><h1>الصفحة غير موجودة</h1><Link to="/" className="button primary">العودة للرئيسية</Link></div>}
         </>
@@ -549,7 +562,9 @@ function Auth() {
               ...b,
               role: selected,
               terms: b.terms === "on",
+              ...(register ? { referralCode: getReferralCode() } : {}),
             });
+            if (register) { try { localStorage.removeItem("dorucenie-referral-v1"); } catch {} }
             csrf = r.csrf;
             await refresh();
             go(
@@ -626,6 +641,7 @@ const navs = [
   ["/market", "فرص النشر", BriefcaseBusiness],
   ["/publisher", "حساب النشر", ShieldCheck],
   ["/wallet", "المحفظة", Wallet],
+  ["/affiliate", "التسويق بالعمولة", Users],
   ["/notifications", "الإشعارات", Bell],
   ["/support", "الدعم والمساعدة", LifeBuoy],
   ["/settings", "إعدادات الحساب", Settings],
@@ -635,6 +651,7 @@ const adminNav = [
   ["/admin/apps", "التطبيقات والطلبات", Layers],
   ["/admin/publishers", "حسابات الناشرين", ShieldCheck],
   ["/admin/users", "المستخدمون", Users],
+  ["/admin/affiliates", "إدارة الأفلييت", Users],
   ["/admin/payments", "المدفوعات", CreditCard],
   ["/admin/withdrawals", "طلبات السحب", Wallet],
   ["/admin/disputes", "النزاعات", AlertCircle],
@@ -773,6 +790,8 @@ function Shell() {
             <Market />
           ) : path === "/publisher" ? (
             <Publisher />
+          ) : path === "/affiliate" ? (
+            <AffiliatePage />
           ) : path === "/wallet" ? (
             <WalletPage />
           ) : path.startsWith("/checkout") ? (
@@ -2536,6 +2555,7 @@ function Admin() {
     setSelected(null);
     setQuery("");
   }, [section]);
+  if (section === "affiliates") return <AffiliatePage admin />;
   if (section === "overview")
     return (
       <>
@@ -2795,7 +2815,7 @@ function Admin() {
                       ) : section === "payments" ||
                         section === "withdrawals" ? (
                         <span className="numeric">
-                          {money(r.amount)} {r.network && `· ${r.network}`}
+                          {money(r.amount)} {r.network && `· ${r.network}`} {r.source === "affiliate" && "· أفلييت"}
                         </span>
                       ) : (
                         r.body.slice(0, 55)
@@ -3033,6 +3053,8 @@ function AdminSettings() {
               ...Object.fromEntries(
                 monetary.map(([k]) => [k, Math.round(Number(b[k]) * 100)]),
               ),
+              affiliateBps: Math.round(Number(b.affiliatePercent) * 100),
+              affiliateEnabled: b.affiliateEnabled === "on",
               commissionBps: Math.round(Number(b.commission) * 100),
               withdrawBps: Math.round(Number(b.withdrawPercent) * 100),
               holdHours: Number(b.holdHours),
@@ -3090,6 +3112,8 @@ function AdminSettings() {
               defaultValue={s.supportEmail}
             />
           </div>
+          <Field label="نسبة الأفلييت من حصة المنصة (%)" name="affiliatePercent" type="number" min="0" max="50" step="0.01" required defaultValue={s.affiliateBps / 100} />
+          <label className="checkbox"><input type="checkbox" name="affiliateEnabled" defaultChecked={s.affiliateEnabled} />تفعيل الأفلييت للإحالات والطلبات الجديدة</label>
           <fieldset className="network-settings"><legend>شبكات السحب المتاحة</legend><p className="muted">فعّل الشبكات التي تستطيع تنفيذ التحويل عليها. تعطيل شبكة يمنع الطلبات الجديدة فقط. إلغاء تفعيل الجميع يوقف طلبات السحب الجديدة.</p><div className="network-settings-grid">{cryptoMethods.map(m => <label className="checkbox" key={m.id}><input type="checkbox" name={`network_${m.id}`} defaultChecked={enabledMethods(s).some(n => n.id === m.id)}/><span><strong>{m.asset}</strong><small>{m.label}</small></span></label>)}</div></fieldset>
           <label className="checkbox">
             <input
@@ -3109,3 +3133,35 @@ function AdminSettings() {
   );
 }
 createRoot(document.getElementById("root")).render(<App />);
+
+function AffiliatePage({ admin = false }) {
+  const { data, run, toast } = useApp();
+  const a = data.affiliate;
+  const methods = enabledMethods(data.settings);
+  const url = a.profile ? `${location.origin}/register?ref=${a.profile.code}` : "";
+  return <>
+    <Heading title={admin ? "إدارة الأفلييت" : "شارك Dorucenie واربح"} text="أرباح على طلبات النشر المكتملة للعملاء الذين يسجلون عبر رابطك. لا توجد عمولة على التسجيل أو شحن الرصيد أو التجديدات." />
+    <Notice>النسبة الحالية: {data.settings.affiliateBps / 100}% من حصة المنصة، وليست من كامل قيمة الطلب. تثبت النسبة عند إنشاء طلب النشر، وتُضاف الأرباح بعد انتهاء مهلة الاعتراض والتسوية. {data.settings.affiliateEnabled ? "البرنامج متاح." : "البرنامج متوقف للإحالات والطلبات الجديدة."}</Notice>
+    {admin ? <p><Link to="/admin/settings">تعديل النسبة والتفعيل</Link> · <Link to="/admin/withdrawals">مراجعة وتنفيذ طلبات السحب</Link></p> : !a.profile ?
+      <Section title="انضم إلى برنامج الشركاء"><p>مشاركة الرابط تحفظ الإحالة لمدة 30 يومًا في هذا المتصفح. تُربط بالعميل الجديد عند التسجيل فقط. الإحالات الذاتية والطلبات التي تكون فيها الناشر لا تكسب عمولة.</p><Button disabled={!data.settings.affiliateEnabled} onClick={() => run(() => api('/affiliate/join', {}))}>إنشاء رابط الإحالة</Button></Section> :
+      <Section title="رابط الإحالة الخاص بك"><Field label="رابط التسجيل" value={url} readOnly dir="ltr" onFocus={e => e.target.select()} /><Button onClick={async () => { try { await navigator.clipboard.writeText(url); toast('تم نسخ الرابط'); } catch { toast('حدد الرابط وانسخه يدويًا'); } }}>نسخ الرابط</Button><p className="muted">أول رابط إحالة محفوظ لمدة 30 يومًا. يشترط تسجيل حساب عميل جديد من المتصفح نفسه.</p></Section>}
+    <div className="stats-grid">
+      <Stat title="العملاء المُحالون" value={a.referrals} icon={Users} />
+      <Stat title="إجمالي العمولات" value={money(a.totalEarned)} icon={Wallet} />
+      {!admin && <Stat title="متاح للسحب" value={money(a.balance.available)} icon={Wallet} />}
+      {!admin && <Stat title="محجوز للسحب" value={money(a.balance.held)} icon={Wallet} />}
+      {admin && <Stat title="الشركاء" value={a.partners.length} icon={Users} />}
+    </div>
+    {!admin && a.profile && <Section title="سحب أرباح الأفلييت">
+      <p>رصيد الأفلييت منفصل عن محفظة الخدمات. الحد الأدنى {money(data.settings.minWithdrawal)}. الرسوم {money(data.settings.withdrawFee)} + {data.settings.withdrawBps / 100}%. تنفذ الإدارة التحويل بعد المراجعة، ولا يتم الدفع تلقائيًا.</p>
+      {methods.length ? <ActionForm submit="طلب سحب" onSubmit={b => api('/affiliate/withdrawals', {...b, amount: Math.round(Number(b.amount) * 100), confirmed: b.confirmed === 'on'})}>
+        <Field label="المبلغ (USD)" name="amount" type="number" step="0.01" min={data.settings.minWithdrawal / 100} max={a.balance.available / 100} required />
+        <Field label="العملة والشبكة"><select name="network" required>{methods.map(m => <option key={m.id} value={m.id}>{m.asset} — {m.label}</option>)}</select></Field>
+        <Field label="عنوان محفظتك" name="address" dir="ltr" required minLength={20} maxLength={100} />
+        <label className="checkbox"><input name="confirmed" type="checkbox" required />أؤكد صحة العنوان والشبكة ورسوم السحب</label>
+      </ActionForm> : <Notice>طلبات السحب متوقفة حتى تفعيل شبكة تحويل من الإدارة.</Notice>}
+    </Section>}
+    <Section title="العمولات المكتسبة">{a.commissions.length ? <div className="table-wrap"><table><thead><tr><th>التاريخ</th>{admin && <th>الشريك</th>}<th>النسبة</th><th>العمولة</th></tr></thead><tbody>{a.commissions.map(c => <tr key={c.id}><td>{new Date(c.createdAt).toLocaleDateString()}</td>{admin && <td>{data.users.find(u => u.id === c.owner)?.name || c.owner}</td>}<td>{c.bps / 100}%</td><td>{money(c.amount)}</td></tr>)}</tbody></table></div> : <p className="muted">لا توجد عمولات مكتسبة حتى الآن.</p>}</Section>
+    <Section title="طلبات سحب الأفلييت">{a.withdrawals.length ? a.withdrawals.map(w => <div className="notice" key={w.id}><strong>{money(w.amount)}</strong> — {w.status === 'paid' ? 'تم التحويل' : w.status === 'rejected' ? 'مرفوض' : 'بانتظار المراجعة'} · الصافي {money(w.net)}{w.adminReference && <p className="break-all">{w.adminReference}</p>}</div>) : <p className="muted">لا توجد طلبات سحب.</p>}</Section>
+  </>;
+}

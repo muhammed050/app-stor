@@ -31,7 +31,7 @@ export async function queueRecordEmails(kind,previous,value) {
  } else if(kind==='payment'&&['approved','rejected','failed'].includes(value.status)){
   await queueEmail({owner:value.owner,key,subject:value.status==='approved'?'تم تأكيد الدفع وإضافة الرصيد':'تحديث حالة الدفع',message:value.status==='approved'?`تم تأكيد دفع ${usd(value.amount)} وإضافته إلى محفظتك.`:`حالة طلب الدفع: ${status}. المبلغ: ${usd(value.amount)}. راجع التفاصيل في المحفظة.`,path:'/wallet'});
  } else if(kind==='withdrawal'){
-  await queueEmail({owner:value.owner,key,subject:value.status==='paid'?'تم تنفيذ طلب السحب':'تحديث طلب السحب',message:`حالة الطلب: ${status}\nالمبلغ: ${usd(value.amount)}\nالرسوم: ${usd(value.fee)}\nالصافي: ${usd(value.net)}\nالشبكة: ${value.network}\n${value.status==='paid'?`معرّف المعاملة: ${value.adminReference}`:value.status==='rejected'?'أُعيد المبلغ المحجوز إلى الرصيد المتاح.':'سيراجع فريق الإدارة الطلب قبل تنفيذ التحويل.'}`,path:'/wallet'});
+  await queueEmail({owner:value.owner,key,subject:value.status==='paid'?'تم تنفيذ طلب السحب':'تحديث طلب السحب',message:`حالة الطلب: ${status}\nالمبلغ: ${usd(value.amount)}\nالرسوم: ${usd(value.fee)}\nالصافي: ${usd(value.net)}\nالشبكة: ${value.network}\n${value.status==='paid'?`معرّف المعاملة: ${value.adminReference}`:value.status==='rejected'?'أُعيد المبلغ المحجوز إلى الرصيد المتاح.':'سيراجع فريق الإدارة الطلب قبل تنفيذ التحويل.'}`,path:value.source==='affiliate'?'/affiliate':'/wallet'});
  }
 }
 export async function processEmails({limit=8,fetcher=fetch,clock=Date.now}={}){

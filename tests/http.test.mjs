@@ -240,3 +240,22 @@ test("listing image bytes and access are restricted to owner, admin and chosen p
   if(status===200)assert.deepEqual(Buffer.from(await r.arrayBuffer()),bytes);
  }
 });
+
+test('affiliate signup attribution, auth, CSRF and owner isolation through HTTP', async () => {
+  const client = await register('affiliate-partner@example.test');
+  const other = await register('affiliate-outsider@example.test');
+  assert.equal((await req('/affiliate/join', {})).status, 401);
+  assert.equal((await req('/affiliate/join', {}, {...client, csrf:'wrong'})).status, 403);
+  const joined = await req('/affiliate/join', {}, client);
+  assert.equal(joined.status, 200);
+  assert.match(joined.body.code, /^[a-f0-9]{32}$/);
+  const signup = await req('/auth/register', {
+    name:'Referred Customer', email:'referred@example.test', password:'secure-test-password',
+    role:'client', terms:true, referralCode:joined.body.code,
+  });
+  assert.equal(signup.status, 201);
+  assert.equal((await record(`referral:${signup.body.user.id}`)).owner, client.user.id);
+  assert.equal((await req('/state', undefined, client)).body.affiliate.referrals, 1);
+  assert.equal((await req('/state', undefined, other)).body.affiliate.referrals, 0);
+  assert.equal((await req('/affiliate/withdrawals', {amount:2500, network:'USDT-BEP20', address:`0x${'1'.repeat(40)}`, confirmed:true}, client)).status, 409);
+});

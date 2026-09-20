@@ -82,6 +82,8 @@ export async function notify(owner, title, body, link = "/dashboard") {
   });
 }
 export const defaults = {
+  affiliateEnabled: true,
+  affiliateBps: 1000,
   reviewFee: 1000,
   minPublishBudget: 5000,
   commissionBps: 2000,

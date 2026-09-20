@@ -1,3 +1,4 @@
+import { attachReferral } from './affiliate.mjs';
 import {queueEmail} from "./email.mjs";
 import {
   randomBytes,
@@ -22,7 +23,7 @@ export function passwordMatches(password, stored) {
     return false;
   }
 }
-export async function createUser({ name, email, password, role }) {
+export async function createUser({ name, email, password, role, referralCode }) {
   const user = {
     id: id(),
     name,
@@ -34,6 +35,7 @@ export async function createUser({ name, email, password, role }) {
   };
   await atomic(async()=>{
     await db.prepare("INSERT INTO users VALUES(?,?,?,?,?,?,?)").run(...Object.values(user));
+    await attachReferral(user, referralCode);
     if(role!=="admin")await queueEmail({owner:user.id,key:`welcome:${user.id}`,subject:"أهلًا بك في Dorucenie",message:role==='publisher'?"تم إنشاء حسابك كناشر. أكمل ملف حساب النشر لبدء إجراءات الاعتماد.":"تم إنشاء حسابك. يمكنك تجهيز تطبيقك وملفات المتجر وإرسال طلب نشر من لوحة التحكم.",path:role==='publisher'?'/publisher':'/dashboard'});
   });
   return cleanUser(user);

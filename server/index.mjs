@@ -1,3 +1,4 @@
+import { enrollAffiliate } from './affiliate.mjs';
 import {emailConfiguration, queueEmail, processEmails, retryEmail} from "./email.mjs";
 import { publicPages } from "../shared/seo.mjs";
 import { appOrigin } from "./config.mjs";
@@ -261,6 +262,7 @@ export async function handler(req, res) {
           email,
           password,
           role: b.role,
+          referralCode: b.referralCode,
         });
         await audit(user.id, "auth.register", user.id);
         return json(res, 201, {
@@ -398,7 +400,9 @@ export async function handler(req, res) {
         result = {
           ok: true,
         };
-      } else if (path === "/api/apps") result = await d.createApp(u, b);
+      } else if (path === "/api/affiliate/join") result = await enrollAffiliate(u);
+      else if (path === "/api/affiliate/withdrawals") result = await d.withdraw(u, b, "affiliate");
+      else if (path === "/api/apps") result = await d.createApp(u, b);
       else if (parts[1] === "apps" && parts.length === 4) {
         const key = parts[2];
         const actions = {
@@ -453,7 +457,7 @@ export async function handler(req, res) {
     let file = resolve(root, `.${decodeURIComponent(path)}`);
     if (!file.startsWith(root + "/") && file !== root) d.fail("غير مسموح", 403);
     const publicPage = Object.hasOwn(publicPages, path);
-    const privatePage = /^\/(dashboard|apps|market|publisher|wallet|checkout|notifications|support|settings|admin|login|register|forgot|reset)(\/|$)/.test(path);
+    const privatePage = /^\/(dashboard|affiliate|apps|market|publisher|wallet|checkout|notifications|support|settings|admin|login|register|forgot|reset)(\/|$)/.test(path);
     let responseStatus = 200;
     if (publicPage) file = resolve(root, `.${path}/index.html`);
     else if (privatePage) { file = resolve(root, "app.html"); res.setHeader("X-Robots-Tag", "noindex, nofollow"); }
