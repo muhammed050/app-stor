@@ -1,3 +1,4 @@
+import { affiliateState, creditAffiliate, affiliateAccount, assertAffiliatePayout } from './affiliate.mjs';
 import {emailConfiguration, emailSummary} from "./email.mjs";
 import {validateListing} from "./listing.mjs";
 import { cryptoMethods, enabledMethods, methodById, validAddress, validTransaction } from "../shared/crypto.mjs";
@@ -98,6 +99,7 @@ export async function state(u) {
     const publishers = await records("publisher");
     return {
       user: cleanUser(u),
+      affiliate: await affiliateState(u),
       settings: await settings(),
       balance: await balance(u.id),
       ledger: await db
@@ -143,7 +145,7 @@ export async function state(u) {
         (r) => admin || r.owner === u.id,
       ),
       withdrawals: (await records("withdrawal")).filter(
-        (r) => admin || r.owner === u.id,
+        (r) => admin || (r.owner === u.id && r.source !== "affiliate"),
       ),
       tickets: (await records("ticket")).filter(
         (r) => admin || r.owner === u.id,
@@ -220,6 +222,7 @@ export async function createApp(u, b) {
         status: "reviewing",
         price: {
           ...snapshot(s),
+          affiliateBps: s.affiliateEnabled ? s.affiliateBps : 0,
           publishFee: budget,
           publisherShare:
             budget - Math.round((budget * s.commissionBps) / 10000),
@@ -434,6 +437,7 @@ export async function settle(key, actor = "system") {
         key,
         `publish-platform:${key}`,
       );
+      await creditAffiliate(a);
       a.status = "completed";
       timeline(a, "اكتملت الصفقة وصرفت حصة الناشر إلى محفظته");
       await save("app", a);
@@ -608,9 +612,11 @@ export async function payment(u, b) {
     });
   });
 }
-export async function withdraw(u, b) {
+export async function withdraw(u, b, source = "publisher") {
   return await atomic(async () => {
-    role(u, "publisher");
+    role(u, ...(source === "affiliate" ? ["client", "publisher"] : ["publisher"]));
+    if (source === "affiliate") await assertAffiliatePayout(u.id);
+    const account = source === "affiliate" ? affiliateAccount(u.id) : u.id;
     const s = await settings();
     if (amount(b.amount) < s.minWithdrawal)
       fail("المبلغ أقل من الحد الأدنى للسحب");
@@ -624,6 +630,7 @@ export async function withdraw(u, b) {
     if (fee >= b.amount) fail("المبلغ لا يغطي الرسوم");
     return await atomic(async () => {
       const r = await save("withdrawal", {
+        source,
         owner: u.id,
         name: u.name,
         amount: b.amount,
@@ -635,7 +642,7 @@ export async function withdraw(u, b) {
         status: "pending",
       });
       await post(
-        u.id,
+        account,
         -r.amount,
         r.amount,
         "حجز طلب سحب عملات رقمية",
@@ -679,6 +686,10 @@ export async function adminAction(u, kind, key, b) {
       }
       if (kind === "settings") {
         const s = await settings();
+        if (b.affiliateEnabled !== undefined) {
+          if (typeof b.affiliateEnabled !== "boolean") fail("إعداد أفلييت غير صالح");
+          s.affiliateEnabled = b.affiliateEnabled;
+        }
         for (const k of [
           "reviewFee",
           "minPublishBudget",
@@ -697,7 +708,7 @@ export async function adminAction(u, kind, key, b) {
               fail("سعر غير صالح");
             s[k] = b[k];
           }
-        for (const k of ["commissionBps", "withdrawBps"])
+        for (const k of ["commissionBps", "withdrawBps", "affiliateBps"])
           if (b[k] !== undefined) {
             if (!Number.isInteger(b[k]) || b[k] < 0 || b[k] > 5000)
               fail("النسبة يجب أن تكون بين 0 و50 بالمئة");
@@ -853,9 +864,11 @@ export async function adminAction(u, kind, key, b) {
           "/wallet",
         );
       } else if (kind === "withdrawals") {
+        const account = r.source === "affiliate" ? affiliateAccount(r.owner) : r.owner;
         if (r.status !== "pending") fail("عولج طلب السحب بالفعل", 409);
         r.adminReference = text(b.reference, 3, 200);
         if (b.action === "approve") {
+          if (r.source === "affiliate") await assertAffiliatePayout(r.owner);
           const quantity = Number(b.cryptoAmount);
           if (!Number.isFinite(quantity) || quantity <= 0)
             fail("أدخل كمية العملة التي تم تحويلها");
@@ -873,7 +886,7 @@ export async function adminAction(u, kind, key, b) {
             fail("مرجع التحويل مستخدم");
           await platform(r.fee || 0, "رسوم سحب", key, `withdraw-fee:${key}`);
           await post(
-            r.owner,
+            account,
             0,
             -r.amount,
             "سحب منفذ بمرجع تحويل",
@@ -883,7 +896,7 @@ export async function adminAction(u, kind, key, b) {
           r.status = "paid";
         } else if (b.action === "reject") {
           await post(
-            r.owner,
+            account,
             r.amount,
             -r.amount,
             "رد طلب سحب مرفوض",
@@ -892,7 +905,7 @@ export async function adminAction(u, kind, key, b) {
           );
           r.status = "rejected";
         } else fail("إجراء غير صالح");
-        await notify(r.owner, "تحديث طلب السحب", r.adminReference, "/wallet");
+        await notify(r.owner, "تحديث طلب السحب", r.adminReference, r.source === "affiliate" ? "/affiliate" : "/wallet");
       } else if (kind === "tickets") {
         r.reply = text(b.reply, 3, 4000);
         r.status = b.close ? "closed" : "open";

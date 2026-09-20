@@ -46,7 +46,7 @@
       "destination": "/legal/refunds/index.html"
     },
     {
-      "source": "/:path(dashboard|apps|market|publisher|wallet|checkout|notifications|support|settings|admin|login|register|forgot|reset)/:rest*",
+      "source": "/:path(dashboard|affiliate|apps|market|publisher|wallet|checkout|notifications|support|settings|admin|login|register|forgot|reset)/:rest*",
       "destination": "/app.html"
     }
   ],
@@ -61,7 +61,7 @@
       ]
     },
     {
-      "source": "/:path(dashboard|apps|market|publisher|wallet|checkout|notifications|support|settings|admin|login|register|forgot|reset)/:rest*",
+      "source": "/:path(dashboard|affiliate|apps|market|publisher|wallet|checkout|notifications|support|settings|admin|login|register|forgot|reset)/:rest*",
       "headers": [
         {
           "key": "X-Robots-Tag",

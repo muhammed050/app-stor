@@ -75,6 +75,7 @@ test("user budget minimum and commission snapshot enforced on server", async () 
     budget: 8000,
   });
   assert.equal(app.price.publishFee, 8000);
+  assert.equal(app.price.affiliateBps, 1000);
   assert.equal(app.price.publisherShare, 6400);
   assert.deepEqual(await balance(client.id), {
     available: 49000,
