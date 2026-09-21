@@ -5,8 +5,6 @@ import React, {
   useEffect,
   useContext,
   createContext,
-  lazy,
-  Suspense,
 } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -70,11 +68,6 @@ import { applyLanguage, getLanguage, LanguageSwitcher, translateDocument, transl
 import { publicPages, origin as siteOrigin, pageSchema } from "../shared/seo.mjs";
 import { cryptoMethods, enabledMethods, methodById, transactionUrl } from "../shared/crypto.mjs";
 import { requestJson } from "./http.mjs";
-const WhopEmbed = lazy(() =>
-  import("@whop/checkout/react").then((m) => ({
-    default: m.WhopCheckoutEmbed,
-  })),
-);
 const Context = createContext(null);
 const useApp = () => useContext(Context);
 let csrf = "";
@@ -2200,8 +2193,106 @@ function WalletPage() {
     </>
   );
 }
+function WhopElementsCheckout({ checkoutConfiguration, buyerEmail }) {
+  const hostRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let checkoutHandle = null;
+    let elementHandle = null;
+    let cancelled = false;
+    const script = document.querySelector("script[data-whop-elements]");
+
+    const destroy = () => {
+      try {
+        elementHandle?.destroy?.();
+      } catch {}
+      try {
+        checkoutHandle?.destroy?.();
+      } catch {}
+      elementHandle = null;
+      checkoutHandle = null;
+    };
+
+    const mount = () => {
+      if (cancelled || !hostRef.current) return;
+      try {
+        if (typeof window.WhopElements !== "function")
+          throw new Error("Whop Elements SDK did not initialize");
+
+        const whop = window.WhopElements();
+        if (!whop?.checkout?.create)
+          throw new Error("Whop Checkout Elements is unavailable");
+
+        checkoutHandle = whop.checkout.create({
+          checkoutConfiguration,
+          returnUrl: `${location.origin}/checkout/complete`,
+        });
+        elementHandle = checkoutHandle.create("checkout", {
+          buyerEmail: buyerEmail || "",
+          lockBuyerEmail: Boolean(buyerEmail),
+          onReady: () => {
+            if (!cancelled) setReady(true);
+          },
+          onError: (event) => {
+            if (!cancelled)
+              setError(
+                event?.message ||
+                  "تعذر تحميل نموذج الدفع الآمن من Whop. حاول تحديث الصفحة.",
+              );
+          },
+        });
+        elementHandle.mount(hostRef.current);
+      } catch (cause) {
+        destroy();
+        if (!cancelled)
+          setError(
+            cause?.message ||
+              "تعذر تحميل نموذج الدفع الآمن من Whop. حاول تحديث الصفحة.",
+          );
+      }
+    };
+
+    setReady(false);
+    setError("");
+
+    if (typeof window.WhopElements === "function") {
+      mount();
+    } else if (script) {
+      const failed = () => {
+        if (!cancelled)
+          setError("تعذر تحميل Whop Elements. تحقق من الاتصال ثم حاول مجددًا.");
+      };
+      script.addEventListener("load", mount, { once: true });
+      script.addEventListener("error", failed, { once: true });
+      return () => {
+        cancelled = true;
+        script.removeEventListener("load", mount);
+        script.removeEventListener("error", failed);
+        destroy();
+      };
+    } else {
+      setError("Whop Elements غير متاح في هذه الصفحة.");
+    }
+
+    return () => {
+      cancelled = true;
+      destroy();
+    };
+  }, [checkoutConfiguration, buyerEmail]);
+
+  return (
+    <div className="whop-elements-checkout">
+      {!ready && !error && <p>جاري تحميل الدفع الآمن…</p>}
+      {error && <Notice>{error}</Notice>}
+      <div ref={hostRef} />
+    </div>
+  );
+}
+
 function Checkout() {
-  const { data, go, refresh } = useApp();
+  const { data, user, refresh } = useApp();
   const [payment, setPayment] = useState(null),
     [paidNotice, setPaidNotice] = useState(
       location.pathname.endsWith("/complete"),
@@ -2239,21 +2330,10 @@ function Checkout() {
               استقبال الأموال.
             </Notice>
           ) : payment ? (
-            <Suspense fallback={<p>جاري تحميل الدفع الآمن…</p>}>
-              <WhopEmbed
-                planId={payment.planId}
-                sessionId={payment.sessionId}
-                returnUrl={`${location.origin}/checkout/complete`}
-                theme="light"
-                themeOptions={{
-                  accentColor: "#0e8d75",
-                  backgroundColor: "#ffffff",
-                  borderRadius: 10,
-                }}
-                skipRedirect
-                onComplete={() => setPaidNotice(true)}
-              />
-            </Suspense>
+            <WhopElementsCheckout
+              checkoutConfiguration={payment.sessionId}
+              buyerEmail={user?.email || ""}
+            />
           ) : (
             <ActionForm
               submit="متابعة إلى الدفع الآمن"
