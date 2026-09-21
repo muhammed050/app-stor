@@ -19,7 +19,6 @@
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans-arabic": "^5.3.0",
-    "@whop/checkout": "^0.7.0",
     "lucide-react": "^0.468.0",
     "pg": "8.23.0",
     "react": "^19.2.0",
